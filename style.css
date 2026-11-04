@@ -124,3 +124,52 @@ td{font-size:14px;padding:16px 19px}
  .analysis-stat span{font-size:9px}
  .analysis-stat b{font-size:11px}
 }
+
+/* Czytelna nawigacja i prognozy przedmeczowe */
+.topbar{height:74px}
+.main-nav{gap:clamp(12px,2vw,28px)}
+.nav-link{font-size:13px;padding:10px 0;white-space:nowrap}
+.nav-link.active{color:var(--cyan)}
+.section{padding-top:88px}
+.section-heading{margin-bottom:28px}
+.section-heading p{max-width:620px;line-height:1.7}
+.fixtures-layout{gap:20px}
+.fixtures-list{gap:0}
+.fixture-card{padding:24px 26px;border-bottom:1px solid var(--line)}
+.fixture-card:last-child{border-bottom:0}
+.fixture-main{padding:10px 0 6px}
+.fixture-forecast{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1fr);gap:10px 24px;align-items:center;margin:18px 0 0;padding:16px 18px;border-radius:13px;background:rgba(8,15,28,.78);border:1px solid var(--line)}
+.forecast-main{display:flex;flex-direction:column;gap:5px}
+.forecast-label{font-size:10px;letter-spacing:.14em;color:var(--muted);font-weight:700}
+.forecast-main>b{font-size:15px;color:var(--text)}
+.forecast-main>small,.forecast-source{font-size:11px;color:var(--muted)}
+.fixture-forecast.high{border-left:3px solid var(--red)}
+.fixture-forecast.medium{border-left:3px solid var(--gold)}
+.fixture-forecast.low{border-left:3px solid var(--cyan)}
+.forecast-probs{display:flex;gap:14px;flex-wrap:wrap}
+.forecast-probs>span{font-size:11px;color:#aab8ce;white-space:nowrap}
+.forecast-probs b{color:var(--text);font-size:13px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
+.dot.low{background:var(--cyan)}.dot.mid{background:var(--gold)}.dot.high{background:var(--red)}
+.forecast-source{grid-column:1/-1}
+.fixture-forecast.unavailable{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.fixture-forecast.unavailable b{font-size:14px}
+.score-strip{padding-top:20px;padding-bottom:8px}
+.live-matches{gap:12px}
+.score-card{border-radius:14px}
+.panel{box-shadow:0 12px 34px rgba(0,0,0,.12)}
+.section-heading h2{letter-spacing:-.04em}
+.stats-grid{gap:18px}
+.stat-panel{min-height:350px}
+.discipline-panel{overflow:hidden}
+.analyzer-panel{padding:28px}
+@media(max-width:760px){
+ .topbar{height:68px}
+ .main-nav{display:none}
+ .fixture-card{padding:18px 14px}
+ .fixture-forecast{grid-template-columns:1fr;gap:12px;padding:14px}
+ .forecast-source{grid-column:auto}
+ .forecast-probs{gap:10px}
+ .section{padding-top:66px}
+ .analyzer-panel{padding:18px}
+}

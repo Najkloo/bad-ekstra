@@ -91,13 +91,40 @@ async function fixturesForDate(date){
 async function loadFixtures(date){
   state.fixtures=await fixturesForDate(fmtDate(date));renderFixtures();renderCalendar();
 }
+function cardForecastForTeams(homeName, awayName){
+  const norm=s=>String(s||"").trim().toLocaleLowerCase("pl-PL");
+  const h=state.discipline.find(x=>norm(x.name)===norm(homeName));
+  const a=state.discipline.find(x=>norm(x.name)===norm(awayName));
+  if(!h||!a||!h.m||!a.m) return null;
+  const lambda=Math.max(.1,(h.yAvg||0)+(a.yAvg||0));
+  const pAtLeast=(k)=>{
+    let term=Math.exp(-lambda),sum=term;
+    for(let i=1;i<k;i++){term*=lambda/i;sum+=term;}
+    return Math.max(0,Math.min(1,1-sum));
+  };
+  const high=pAtLeast(5), low=1-pAtLeast(4);
+  const mid=Math.max(0,1-high-low);
+  return {lambda,high,low,mid,sample:Math.min(h.m,a.m)};
+}
+function forecastMarkup(teams){
+  const f=cardForecastForTeams(teams.homeName,teams.awayName);
+  if(!f) return `<div class="fixture-forecast unavailable"><span class="forecast-label">PROGNOZA KARTEK</span><b>Brak wystarczających danych</b><small>Prognoza pojawi się po zebraniu statystyk sezonowych.</small></div>`;
+  const pct=n=>`${Math.round(n*100)}%`;
+  const category=f.high>=.55?"Wysokie prawdopodobieństwo":f.high>=.35?"Umiarkowane prawdopodobieństwo":"Niskie prawdopodobieństwo";
+  const tone=f.high>=.55?"high":f.high>=.35?"medium":"low";
+  return `<div class="fixture-forecast ${tone}">
+    <div class="forecast-main"><span class="forecast-label">PROGNOZA ŻÓŁTYCH KARTEK</span><b>${category}</b><small>5 lub więcej kartek: ${pct(f.high)}</small></div>
+    <div class="forecast-probs"><span><i class="dot low"></i> 0–3: <b>${pct(f.low)}</b></span><span><i class="dot mid"></i> 4: <b>${pct(f.mid)}</b></span><span><i class="dot high"></i> 5+: <b>${pct(f.high)}</b></span></div>
+    <small class="forecast-source">Na podstawie ${f.sample} meczów z danymi dla każdej drużyny</small>
+  </div>`;
+}
 function renderFixtures(){
   $("#fixtures-title").textContent=new Date(fmtDate(state.selectedDate)+"T12:00:00").toLocaleDateString("pl-PL",{day:"numeric",month:"long",year:"numeric"});
-  $("#fixtures-subtitle").textContent="MECZE EKSTRAKLASY • ANALIZA MECZOWA";
+  $("#fixtures-subtitle").textContent="MECZE EKSTRAKLASY • PROGNOZA PRZEDMECZOWA";
   $("#fixture-count").textContent=`${state.fixtures.length} SPOTKAŃ`;
   const el=$("#fixtures-list");
   if(!state.fixtures.length){el.innerHTML='<div class="empty empty-large">Brak spotkań Ekstraklasy w tym dniu.<br><small>Wybierz inną datę w kalendarzu.</small></div>';return;}
-  el.innerHTML=state.fixtures.map((f,i)=>{
+  el.innerHTML=state.fixtures.map(f=>{
     const teams=fixtureTeams(f),live=isLive(f),done=isDone(f),dt=fixtureDateTime(f);
     const status=live?`<span class="match-live">${esc(f.minute?`${f.minute}'`:"NA ŻYWO")}</span>`:done?'<span class="match-done">ZAKOŃCZONY</span>':`<span class="match-time">${esc(String(dt).slice(11,16)||"—")}</span>`;
     const scoreText=done||live?`${esc(score(f,"home"))}<i>:</i>${esc(score(f,"away"))}`:"— : —";
@@ -108,12 +135,9 @@ function renderFixtures(){
         <div class="fixture-score">${scoreText}</div>
         <div class="fixture-team away"><b>${esc(teams.awayName)}</b>${crest(teams.awayName,teams.awayLogo||state.crestById.get(String(teams.awayId||"")),true)}</div>
       </div>
-      <div class="fixture-analysis" id="fixture-analysis-${esc(fixtureId(f))}">
-        ${done||live?'<span class="analysis-loading">Pobieranie analizy meczu…</span>':`<span class="analysis-upcoming">Analiza statystyk będzie dostępna po zakończeniu spotkania.</span>`}
-      </div>
+      ${forecastMarkup(teams)}
     </article>`;
   }).join("");
-  state.fixtures.filter(f=>isDone(f)||isLive(f)).forEach(f=>loadFixtureAnalysis(f));
 }
 async function getFixtureDiscipline(f){
   const id=fixtureId(f);
@@ -187,7 +211,7 @@ async function loadSeasonDiscipline(){
     if(cached&&Date.now()-cached.savedAt<30*60*1000&&Array.isArray(cached.data)){
       state.discipline=cached.data;state.seasonMatches=cached.matchCount||[];
       state.seasonCardMatchTotals=cached.cardMatchTotals||[];
-      state.seasonStatsLoaded=true;renderDiscipline();
+      state.seasonStatsLoaded=true;renderDiscipline();renderFixtures();
       return;
     }
   }catch(e){}
@@ -202,7 +226,7 @@ async function loadSeasonDiscipline(){
   const seen=new Set();
   state.seasonMatches=byDate.filter(f=>{const id=fixtureId(f);if(!id||seen.has(String(id)))return false;seen.add(String(id));return true;})
     .sort((a,b)=>String(fixtureDateTime(a)).localeCompare(String(fixtureDateTime(b))));
-  if(!state.seasonMatches.length){state.discipline=[];state.seasonCardMatchTotals=[];renderDiscipline();return;}
+  if(!state.seasonMatches.length){state.discipline=[];state.seasonCardMatchTotals=[];renderDiscipline();renderFixtures();return;}
   const agg=new Map(), cardMatchTotals=[];
   const ensure=(id,name,logo)=>{const key=String(id??name);if(!agg.has(key))agg.set(key,{id:key,name,logo,y:0,r:0,f:0,m:0,cardMatches:0,foulMatches:0});return agg.get(key);};
   let statDone=0,cardMatchesAvailable=0;
@@ -233,7 +257,7 @@ async function loadSeasonDiscipline(){
     ...x,m:x.cardMatches,yAvg:x.cardMatches?x.y/x.cardMatches:0,
     rAvg:x.cardMatches?x.r/x.cardMatches:0,fAvg:x.foulMatches?x.f/x.foulMatches:0
   })).sort((a,b)=>b.y-a.y||b.r-a.r);
-  state.seasonStatsLoaded=true;renderDiscipline();
+  state.seasonStatsLoaded=true;renderDiscipline();renderFixtures();
   try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline,cardMatchTotals}));}catch(e){}
 }
 function renderDiscipline(){
