@@ -22,7 +22,13 @@ const api = async path => {
 const unwrap = j => Array.isArray(j?.data)?j.data:Array.isArray(j?.fixtures)?j.fixtures:Array.isArray(j?.response)?j.response:[];
 const seasonStartDate = () => {const now=new Date();return new Date(now.getFullYear()-(now.getMonth()<6?1:0),6,1,12)};
 const teamName = (v,fallback="—") => typeof v==="string"?v:(v?.name||v?.short_name||v?.display_name||fallback);
-const teamId = v => typeof v==="object"?(v.id??v.team_id??null):null;
+
+// POPRAWKA: zabezpieczenie przed null.id
+const teamId = v => {
+  if (v == null || typeof v !== "object") return null;
+  return v.id ?? v.team_id ?? v.team?.id ?? null;
+};
+
 const teamLogo = v => {
   if(!v||typeof v!=="object") return "";
   return v.logo_url||v.logo||v.image_url||v.image||v.crest||v.badge||v.photo||"";
@@ -46,6 +52,7 @@ const fixtureTeams = f => {
   return {homeName,awayName,homeLogo,awayLogo,homeId,awayId};
 };
 const score = (f,side) => f[`${side}_score`]??f.score?.[side]??f.goals?.[side]??"—";
+
 function showError(message){
   toast(message);
   if($("#standings-body"))$("#standings-body").innerHTML=`<tr><td colspan="10" class="empty">${esc(message)}</td></tr>`;
@@ -181,7 +188,7 @@ async function loadSeasonDiscipline(){
     statDone++;
     if(statDone%10===0)$("#discipline-period").textContent=`Statystyki pełnego sezonu: ${statDone}/${state.seasonMatches.length} meczów…`;
   });
-  state.discipline=[...agg.values()].filter(x=>x.m>0).map(x=>({...x,yAvg:x.y/x.m,rAvg:x.r/x.m,fAvg:x.f/x.m})).sort((a,b)=>b.y-a.y||b.r-a.r);
+    state.discipline=[...agg.values()].filter(x=>x.m>0).map(x=>({...x,yAvg:x.y/x.m,rAvg:x.r/x.m,fAvg:x.f/x.m})).sort((a,b)=>b.y-a.y||b.r-a.r);
   state.seasonStatsLoaded=true;renderDiscipline();
   try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline}));}catch(e){}
 }
