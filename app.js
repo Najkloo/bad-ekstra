@@ -44,7 +44,9 @@ async function loadStandings(){
 }
 function renderStandings(){
  const body=$("#standings-body");if(!state.standings.length){body.innerHTML='<tr><td colspan="10" class="empty">Brak danych tabeli w odpowiedzi API.</td></tr>';return;}
- body.innerHTML=state.standings.map((r,i)=>{const t=r.team||{};const form=(r.form||"").split("").slice(-5).map(x=>`<i class="form-${x.toLowerCase()}">${x}</i>`).join("");const gd=num(r.goals_for)-num(r.goals_against);
+ body.innerHTML=state.standings.map((r,i)=>{const t=r.team||{};const formRaw=r.form;
+ const formText=typeof formRaw==="string"?formRaw:Array.isArray(formRaw)?formRaw.map(x=>typeof x==="string"?x:(x?.result||x?.outcome||x?.status||"")).join(""):formRaw&&typeof formRaw==="object"?String(formRaw.form||formRaw.results||formRaw.value||""):"";
+ const form=formText.slice(-5).split("").map(x=>`<i class="form-${String(x).toLowerCase()}">${esc(x)}</i>`).join("");const gd=num(r.goals_for)-num(r.goals_against);
  return `<tr><td class="rank">${r.position||i+1}</td><td><div class="team-cell"><span class="team-crest">${esc((t.short_name||t.name||"?").slice(0,2).toUpperCase())}</span><b>${esc(t.name||"—")}</b></div></td><td>${num(r.played)}</td><td>${num(r.won)}</td><td>${num(r.draw)}</td><td>${num(r.lost)}</td><td>${num(r.goals_for)}:${num(r.goals_against)}</td><td class="${gd>0?"positive":gd<0?"negative":""}">${gd>0?"+":""}${gd}</td><td class="points">${num(r.points)}</td><td><div class="form-list">${form||"—"}</div></td></tr>`}).join("");
 }
 function populateTeamSelects(){
