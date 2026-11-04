@@ -5,7 +5,7 @@ const state = {
   leagueId:null, teams:[], standings:[], fixtures:[], discipline:[],
   month:new Date(), selectedDate:new Date(), charts:{}, busy:false,
   seasonStart:null, seasonEnd:null, seasonMatches:[], seasonStatsLoaded:false,
-  fixtureStats:new Map(), crestById:new Map()
+  fixtureStats:new Map(), crestById:new Map(), seasonCardMatchTotals:[]
 };
 const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -22,13 +22,10 @@ const api = async path => {
 const unwrap = j => Array.isArray(j?.data)?j.data:Array.isArray(j?.fixtures)?j.fixtures:Array.isArray(j?.response)?j.response:[];
 const seasonStartDate = () => {const now=new Date();return new Date(now.getFullYear()-(now.getMonth()<6?1:0),6,1,12)};
 const teamName = (v,fallback="—") => typeof v==="string"?v:(v?.name||v?.short_name||v?.display_name||fallback);
-
-// POPRAWKA: zabezpieczenie przed null.id
 const teamId = v => {
   if (v == null || typeof v !== "object") return null;
   return v.id ?? v.team_id ?? v.team?.id ?? null;
 };
-
 const teamLogo = v => {
   if(!v||typeof v!=="object") return "";
   return v.logo_url||v.logo||v.image_url||v.image||v.crest||v.badge||v.photo||"";
@@ -52,7 +49,6 @@ const fixtureTeams = f => {
   return {homeName,awayName,homeLogo,awayLogo,homeId,awayId};
 };
 const score = (f,side) => f[`${side}_score`]??f.score?.[side]??f.goals?.[side]??"—";
-
 function showError(message){
   toast(message);
   if($("#standings-body"))$("#standings-body").innerHTML=`<tr><td colspan="10" class="empty">${esc(message)}</td></tr>`;
@@ -119,18 +115,45 @@ function renderFixtures(){
   }).join("");
   state.fixtures.filter(f=>isDone(f)||isLive(f)).forEach(f=>loadFixtureAnalysis(f));
 }
+async function getFixtureDiscipline(f){
+  const id=fixtureId(f);
+  let statsData=null, events=[];
+  try {
+    const j=await api(`/fixtures/${id}/stats`);
+    const d=j.data||j.stats||j;
+    if(j.available!==false && (d.home||d.away)) statsData=d;
+  } catch(e) {}
+  if(!statsData || statsData.home?.yellow_cards==null || statsData.away?.yellow_cards==null){
+    try {
+      const ej=await api(`/fixtures/${id}/events`);
+      events=unwrap(ej);
+    } catch(e) {}
+  }
+  const countEvents=(side,type) => events.filter(ev =>
+    String(ev.team_side||ev.side||"").toLowerCase()===side &&
+    String(ev.event_type||ev.type||"").toLowerCase().includes(type)
+  ).length;
+  const h=statsData?.home||{}, a=statsData?.away||{};
+  const hY=h.yellow_cards ?? h.yellowCards ?? countEvents("home","yellow");
+  const aY=a.yellow_cards ?? a.yellowCards ?? countEvents("away","yellow");
+  const hR=h.red_cards ?? h.redCards ?? countEvents("home","red");
+  const aR=a.red_cards ?? a.redCards ?? countEvents("away","red");
+  const hF=h.fouls ?? h.total_fouls ?? null;
+  const aF=a.fouls ?? a.total_fouls ?? null;
+  const hasCards=events.length>0 || h.yellow_cards!=null || a.yellow_cards!=null || h.yellowCards!=null || a.yellowCards!=null;
+  return {home:{...h,yellow_cards:Number(hY)||0,red_cards:Number(hR)||0,fouls:hF==null?null:Number(hF)},
+          away:{...a,yellow_cards:Number(aY)||0,red_cards:Number(aR)||0,fouls:aF==null?null:Number(aF)},
+          hasCards,hasFouls:hF!=null||aF!=null};
+}
 async function loadFixtureAnalysis(f){
   const id=fixtureId(f),target=$(`#fixture-analysis-${CSS.escape(String(id))}`);if(!target||!id)return;
   try{
-    const j=await api(`/fixtures/${id}/stats`),d=j.data||j.stats||j;
-    const home=d.home||d.home_team||d.teams?.home||{},away=d.away||d.away_team||d.teams?.away||{};
-    const pick=(o,keys)=>{for(const k of keys){if(o[k]!==undefined&&o[k]!==null)return o[k];}return "—";};
-    const hY=pick(home,["yellow_cards","yellowCards","yellow"]),aY=pick(away,["yellow_cards","yellowCards","yellow"]);
-    const hR=pick(home,["red_cards","redCards","red"]),aR=pick(away,["red_cards","redCards","red"]);
-    const hF=pick(home,["fouls","total_fouls"]),aF=pick(away,["fouls","total_fouls"]);
-    target.innerHTML=`<div class="analysis-stat"><span>🟨 Kartki</span><b>${esc(hY)} : ${esc(aY)}</b></div><div class="analysis-stat"><span>🟥 Czerwone</span><b>${esc(hR)} : ${esc(aR)}</b></div><div class="analysis-stat"><span>⚑ Faule</span><b>${esc(hF)} : ${esc(aF)}</b></div>`;
-    state.fixtureStats.set(String(id),{home,away});
-  }catch(e){target.innerHTML='<span class="analysis-upcoming">Dostawca nie udostępnił statystyk tego meczu.</span>';}
+    const d=await getFixtureDiscipline(f), h=d.home, a=d.away;
+    if(!d.hasCards && !d.hasFouls){target.innerHTML='<span class="analysis-upcoming">Brak szczegółowych statystyk tego spotkania w SportAPI.ai.</span>';return;}
+    const val=(v)=>v==null?"—":v;
+    target.innerHTML=`<div class="analysis-stat"><span>🟨 Żółte kartki</span><b>${val(h.yellow_cards)} : ${val(a.yellow_cards)}</b></div><div class="analysis-stat"><span>🟥 Czerwone</span><b>${val(h.red_cards)} : ${val(a.red_cards)}</b></div><div class="analysis-stat"><span>⚑ Faule</span><b>${val(h.fouls)} : ${val(a.fouls)}</b></div>`;
+    state.fixtureStats.set(String(id),d);
+  }catch(e){target.innerHTML='<span class="analysis-upcoming">Nie udało się pobrać statystyk meczu.</span>';}
 }
 async function loadCalendarMonth(){
   const y=state.month.getFullYear(),m=state.month.getMonth();
@@ -157,40 +180,61 @@ async function mapLimit(items,limit,fn){
 }
 async function loadSeasonDiscipline(){
   const start=seasonStartDate(),end=new Date();state.seasonStart=fmtDate(start);state.seasonEnd=fmtDate(end);
-  $("#discipline-period").textContent=`PEŁNY SEZON • ${start.getFullYear()}/${String(start.getFullYear()+1).slice(-2)} • ${start.toLocaleDateString("pl-PL")} – ${end.toLocaleDateString("pl-PL")}`;
-  const cacheKey=`ei-discipline-${state.leagueId}-${state.seasonStart}-${state.seasonEnd}`;
+  $("#discipline-period").textContent=`PEŁNY SEZON • ${start.getFullYear()}/${String(start.getFullYear()+1).slice(-2)} • ${state.seasonStart} – ${state.seasonEnd}`;
+  const cacheKey=`ei-discipline-v3-${state.leagueId}-${state.seasonStart}-${state.seasonEnd}`;
   try{
     const cached=JSON.parse(localStorage.getItem(cacheKey)||"null");
     if(cached&&Date.now()-cached.savedAt<30*60*1000&&Array.isArray(cached.data)){
-      state.discipline=cached.data;state.seasonMatches=Array(cached.matchCount||0).fill({});
+      state.discipline=cached.data;state.seasonMatches=cached.matchCount||[];
+      state.seasonCardMatchTotals=cached.cardMatchTotals||[];
       state.seasonStatsLoaded=true;renderDiscipline();
-      $("#discipline-period").textContent+=` • pamięć podręczna (${new Date(cached.savedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})})`;
       return;
     }
   }catch(e){}
   const dates=[];for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1))dates.push(fmtDate(d));
   let done=0;const byDate=[];
-  await mapLimit(dates,8,async date=>{const fs=await fixturesForDate(date);byDate.push(...fs.filter(isDone));done++;if(done%20===0)$("#discipline-period").textContent=`Pobieranie sezonu: ${done}/${dates.length} dni…`;});
-  state.seasonMatches=byDate.sort((a,b)=>String(fixtureDateTime(a)).localeCompare(String(fixtureDateTime(b))));
-  if(!state.seasonMatches.length){state.discipline=[];renderDiscipline();return;}
-  const agg=new Map();
-  const add=(id,name,logo,stats)=>{const key=String(id??name);if(!agg.has(key))agg.set(key,{id:key,name,logo,y:0,r:0,f:0,m:0,available:0});const x=agg.get(key);const y=num(stats.yellow_cards??stats.yellowCards??stats.yellow),r=num(stats.red_cards??stats.redCards??stats.red),f=num(stats.fouls??stats.total_fouls);x.y+=y;x.r+=r;x.f+=f;x.m++;if(stats.yellow_cards!==undefined||stats.yellowCards!==undefined||stats.fouls!==undefined||stats.red_cards!==undefined)x.available++;};
-  let statDone=0;
-  await mapLimit(state.seasonMatches,7,async fixture=>{
+  await mapLimit(dates,6,async date=>{
+    const fs=await fixturesForDate(date);
+    byDate.push(...fs.filter(isDone));
+    done++;
+    if(done%15===0)$("#discipline-period").textContent=`Pobieranie terminarza: ${done}/${dates.length} dni…`;
+  });
+  const seen=new Set();
+  state.seasonMatches=byDate.filter(f=>{const id=fixtureId(f);if(!id||seen.has(String(id)))return false;seen.add(String(id));return true;})
+    .sort((a,b)=>String(fixtureDateTime(a)).localeCompare(String(fixtureDateTime(b))));
+  if(!state.seasonMatches.length){state.discipline=[];state.seasonCardMatchTotals=[];renderDiscipline();return;}
+  const agg=new Map(), cardMatchTotals=[];
+  const ensure=(id,name,logo)=>{const key=String(id??name);if(!agg.has(key))agg.set(key,{id:key,name,logo,y:0,r:0,f:0,m:0,cardMatches:0,foulMatches:0});return agg.get(key);};
+  let statDone=0,cardMatchesAvailable=0;
+  await mapLimit(state.seasonMatches,5,async fixture=>{
     const id=fixtureId(fixture);if(!id)return;
+    const t=fixtureTeams(fixture);
     try{
-      const j=await api(`/fixtures/${id}/stats`),d=j.data||j.stats||j;
-      const h=d.home||d.home_team||d.teams?.home, a=d.away||d.away_team||d.teams?.away;
-      const t=fixtureTeams(fixture);
-      if(h)add(t.homeId??h.team_id??`${id}-h`,t.homeName,t.homeLogo||state.crestById.get(String(t.homeId||"")),h);
-      if(a)add(t.awayId??a.team_id??`${id}-a`,t.awayName,t.awayLogo||state.crestById.get(String(t.awayId||"")),a);
+      const d=await getFixtureDiscipline(fixture),h=d.home,a=d.away;
+      const home=ensure(t.homeId??`${id}-h`,t.homeName,t.homeLogo||state.crestById.get(String(t.homeId||"")));
+      const away=ensure(t.awayId??`${id}-a`,t.awayName,t.awayLogo||state.crestById.get(String(t.awayId||"")));
+      if(d.hasCards){
+        home.y+=h.yellow_cards;away.y+=a.yellow_cards;
+        home.r+=h.red_cards;away.r+=a.red_cards;
+        home.m++;away.m++;home.cardMatches++;away.cardMatches++;
+        cardMatchTotals.push(h.yellow_cards+a.yellow_cards);
+        cardMatchesAvailable++;
+      }
+      if(d.hasFouls){
+        if(h.fouls!=null){home.f+=h.fouls;home.foulMatches++;}
+        if(a.fouls!=null){away.f+=a.fouls;away.foulMatches++;}
+      }
     }catch(e){}
     statDone++;
-    if(statDone%10===0)$("#discipline-period").textContent=`Statystyki pełnego sezonu: ${statDone}/${state.seasonMatches.length} meczów…`;
+    if(statDone%10===0)$("#discipline-period").textContent=`Statystyki sezonu: ${statDone}/${state.seasonMatches.length} spotkań…`;
   });
-    state.discipline=[...agg.values()].filter(x=>x.m>0).map(x=>({...x,yAvg:x.y/x.m,rAvg:x.r/x.m,fAvg:x.f/x.m})).sort((a,b)=>b.y-a.y||b.r-a.r);
+  state.seasonCardMatchTotals=cardMatchTotals;
+  state.discipline=[...agg.values()].filter(x=>x.cardMatches>0||x.foulMatches>0).map(x=>({
+    ...x,m:x.cardMatches,yAvg:x.cardMatches?x.y/x.cardMatches:0,
+    rAvg:x.cardMatches?x.r/x.cardMatches:0,fAvg:x.foulMatches?x.f/x.foulMatches:0
+  })).sort((a,b)=>b.y-a.y||b.r-a.r);
   state.seasonStatsLoaded=true;renderDiscipline();
-  try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline}));}catch(e){}
+  try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline,cardMatchTotals}));}catch(e){}
 }
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
@@ -207,14 +251,37 @@ function drawChart(id,labels,values,label,color){
   const canvas=$("#"+id);if(!canvas||!window.Chart)return;if(state.charts[id])state.charts[id].destroy();
   state.charts[id]=new Chart(canvas,{type:"bar",data:{labels,datasets:[{label,data:values,backgroundColor:color,borderRadius:7,borderSkipped:false,maxBarThickness:30}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:"y",plugins:{legend:{display:false},tooltip:{backgroundColor:"#111827",padding:14,titleFont:{size:14},bodyFont:{size:13}}},scales:{x:{grid:{color:"rgba(255,255,255,.08)"},ticks:{color:"#b9c5d8",font:{size:12}}},y:{grid:{display:false},ticks:{color:"#e0e8f5",font:{size:12}}}}}});
 }
+function poissonProbAtLeast(lambda,k){
+  let p0=Math.exp(-lambda),sum=p0,term=p0;
+  for(let i=1;i<k;i++){term*=lambda/i;sum+=term;}
+  return Math.max(0,Math.min(1,1-sum));
+}
+function poissonProbExactly(lambda,k){
+  let p=Math.exp(-lambda);
+  for(let i=1;i<=k;i++)p*=lambda/i;
+  return p;
+}
 function analyze(){
   const h=$("#home-team").value,a=$("#away-team").value,out=$("#analyzer-result");
-  if(!h||!a||h===a){out.innerHTML='<div class="result-placeholder">Wybierz dwie różne drużyny, aby zobaczyć porównanie.</div>';return;}
+  if(!h||!a||h===a){out.innerHTML='<div class="result-placeholder">Wybierz dwie różne drużyny, aby oszacować liczbę kartek.</div>';return;}
   const home=state.discipline.find(x=>String(x.id)===h),away=state.discipline.find(x=>String(x.id)===a);
-  if(!home||!away){out.innerHTML='<div class="result-placeholder">Brakuje pełnych statystyk sezonowych dla jednej z drużyn.</div>';return;}
-  const avg=x=>({cards:x.y/x.m,fouls:x.f/x.m});
-  const x=avg(home),y=avg(away),risk=(x.cards+y.cards+x.fouls/10+y.fouls/10)/2,level=risk>=5?"Wysoki":risk>=3.3?"Umiarkowany":"Niższy";
-  out.innerHTML=`<div class="comparison"><div>${crest(home.name,home.logo)}<small>GOSPODARZE</small><b>${esc(home.name)}</b><span>${x.cards.toFixed(2)} <i>żółtych / mecz</i></span><span>${x.fouls.toFixed(2)} <i>fauli / mecz</i></span></div><div class="comparison-vs">VS</div><div>${crest(away.name,away.logo)}<small>GOŚCIE</small><b>${esc(away.name)}</b><span>${y.cards.toFixed(2)} <i>żółtych / mecz</i></span><span>${y.fouls.toFixed(2)} <i>fauli / mecz</i></span></div></div><div class="risk-meter"><div><small>PROFIL DYSCYPLINARNY SEZONU</small><b>${level}</b></div><div class="meter-track"><i style="width:${Math.min(100,risk/7*100)}%"></i></div></div><p class="disclaimer">Średnie obliczone z ${home.m} i ${away.m} występów z dostępnymi statystykami w bieżącym sezonie.</p>`;
+  if(!home||!away||!home.m||!away.m){out.innerHTML='<div class="result-placeholder">Brakuje historycznych danych o kartkach dla jednej z drużyn.</div>';return;}
+  const lambda=Math.max(0.1,home.yAvg+away.yAvg);
+  const low=poissonProbAtLeast(lambda,4); // 4+ cards
+  const lowThree=Math.max(0,1-low-poissonProbExactly(lambda,4));
+  const exactlyFour=poissonProbExactly(lambda,4);
+  const high=poissonProbAtLeast(lambda,5);
+  const pct=n=>`${(n*100).toFixed(1).replace(".",",")}%`;
+  const level=high>=.55?"Wysokie ryzyko dużej liczby kartek":high>=.35?"Umiarkowane ryzyko dużej liczby kartek":"Niskie ryzyko dużej liczby kartek";
+  const historyCount=Math.min(home.m,away.m);
+  out.innerHTML=`<div class="comparison"><div>${crest(home.name,home.logo)}<small>GOSPODARZE</small><b>${esc(home.name)}</b><span>${home.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${home.m} meczów z danymi</small></div><div class="comparison-vs">VS</div><div>${crest(away.name,away.logo)}<small>GOŚCIE</small><b>${esc(away.name)}</b><span>${away.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${away.m} meczów z danymi</small></div></div>
+  <div class="risk-meter"><div><small>PROGNOZA NA PODSTAWIE SEZONU</small><b>${level}</b></div><div class="meter-track"><i style="width:${Math.min(100,high*100)}%"></i></div></div>
+  <div class="probability-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0;">
+    <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>MAŁO KARTEK (0–3)</small><strong style="font-size:28px;color:#28d9bd;">${pct(lowThree)}</strong></div>
+    <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>ŚREDNIO (4)</small><strong style="font-size:28px;color:#e8bd4d;">${pct(exactlyFour)}</strong></div>
+    <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>DUŻO KARTEK (5+)</small><strong style="font-size:28px;color:#ff7185;">${pct(high)}</strong></div>
+  </div>
+  <p class="disclaimer">Szacunek modelowy Poissona. Oparty na średniej liczbie żółtych kartek obu drużyn w bieżącym sezonie (${home.m} i ${away.m} meczów z danymi). Nie jest gwarancją wyniku ani poradą bukmacherską.</p>`;
 }
 async function refreshAll(){
   if(state.busy)return;state.busy=true;
