@@ -173,3 +173,15 @@ td{font-size:14px;padding:16px 19px}
  .section{padding-top:66px}
  .analyzer-panel{padding:18px}
 }
+
+/* Rozszerzone średnie i analiza fauli */
+.table-scroll table{min-width:900px}
+.forecast-fouls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:9px;background:rgba(106,167,255,.08);border:1px solid rgba(106,167,255,.14)}
+.forecast-fouls span{font-size:11px;color:#9eacc2}
+.forecast-fouls b{font-size:15px;color:#d8e7ff}
+.referee-grid{align-items:stretch}
+.referee-status{min-height:260px}
+.referee-status p{max-width:620px;line-height:1.75}
+@media(max-width:760px){
+ .forecast-fouls{padding:8px 10px}
+}

@@ -44,3 +44,30 @@ Uwaga: endpointy i formaty odpowiedzi dostawcy muszą być zgodne z aktualną do
 - To oznacza większą liczbę zapytań do API podczas pierwszego ładowania. Przy obecnym limicie 2 000 zapytań dziennie pobranie sezonu powinno mieścić się w limicie, ale zależy od liczby rozegranych spotkań i limitów dostawcy.
 - W terminarzu statystyki kartek i fauli są dociągane dla zakończonych lub trwających spotkań, jeśli dostawca je udostępnia.
 - Herby są wyświetlane, gdy API zwraca adres logo drużyny; w przeciwnym razie widoczny jest skrót nazwy.
+
+## Dodatkowe źródło sędziowskie – SoccersAPI
+
+SportAPI.ai pozostaje głównym dostawcą tabeli, terminarza, wyników i statystyk drużyn. SoccersAPI jest dodatkowym źródłem przeznaczonym do profili sędziów i późniejszego łączenia arbitrów z meczami.
+
+### Konfiguracja sekretu
+
+W Cloudflare → Workers & Pages → `ekstraklasa-api` → Settings → Variables and Secrets dodaj sekret:
+
+- Name: `SOCCERS_API_KEY`
+- Value: klucz z panelu SoccersAPI
+
+Nie umieszczaj klucza w `config.js`, `app.js` ani w repozytorium GitHub.
+
+### Bezpieczny proxy SoccersAPI
+
+Worker udostępnia ograniczone trasy proxy:
+
+- `/api/soccersapi/leagues?t=info&id=3060`
+- `/api/soccersapi/seasons?...`
+- `/api/soccersapi/fixtures?...`
+- `/api/soccersapi/referees?t=list`
+- `/api/soccersapi/referees?t=info&id=REFEREE_ID`
+
+Klucz jest dopisywany po stronie Workera. Trasy są cache'owane, aby ograniczyć zużycie darmowego limitu. Nie podawaj `api_key` w zapytaniu z przeglądarki.
+
+Integracja proxy jest przygotowana, ale właściwe wyliczanie statystyk sędziów wymaga pierwszego testu rzeczywistej odpowiedzi SoccersAPI dla sezonu Ekstraklasy (szczególnie pola `referee_id` i struktury statystyk meczu). Nie należy zakładać, że każdy mecz ma przypisanego sędziego.

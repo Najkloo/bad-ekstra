@@ -104,7 +104,8 @@ function cardForecastForTeams(homeName, awayName){
   };
   const high=pAtLeast(5), low=1-pAtLeast(4);
   const mid=Math.max(0,1-high-low);
-  return {lambda,high,low,mid,sample:Math.min(h.m,a.m)};
+  const foulsPerMatch=(Number(h.fAvg)||0)+(Number(a.fAvg)||0);
+  return {lambda,high,low,mid,foulsPerMatch,sample:Math.min(h.m,a.m)};
 }
 function forecastMarkup(teams){
   const f=cardForecastForTeams(teams.homeName,teams.awayName);
@@ -115,7 +116,8 @@ function forecastMarkup(teams){
   return `<div class="fixture-forecast ${tone}">
     <div class="forecast-main"><span class="forecast-label">PROGNOZA ŻÓŁTYCH KARTEK</span><b>${category}</b><small>5 lub więcej kartek: ${pct(f.high)}</small></div>
     <div class="forecast-probs"><span><i class="dot low"></i> 0–3: <b>${pct(f.low)}</b></span><span><i class="dot mid"></i> 4: <b>${pct(f.mid)}</b></span><span><i class="dot high"></i> 5+: <b>${pct(f.high)}</b></span></div>
-    <small class="forecast-source">Na podstawie ${f.sample} meczów z danymi dla każdej drużyny</small>
+    <div class="forecast-fouls"><span>Szacunkowa suma fauli</span><b>${f.foulsPerMatch>0?f.foulsPerMatch.toFixed(1).replace(".",","):"Brak danych"}</b></div>
+    <small class="forecast-source">Na podstawie ${f.sample} meczów z danymi dla każdej drużyny. Suma fauli to suma średnich obu zespołów.</small>
   </div>`;
 }
 function renderFixtures(){
@@ -262,8 +264,8 @@ async function loadSeasonDiscipline(){
 }
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
-  if(!data.length){body.innerHTML='<tr><td colspan="7" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
-  body.innerHTML=data.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td></tr>`).join("");
+  if(!data.length){body.innerHTML='<tr><td colspan="9" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
+  body.innerHTML=data.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td><td>${x.rAvg.toFixed(2)}</td><td>${x.fAvg.toFixed(2)}</td></tr>`).join("");
   const topCards=[...data].sort((a,b)=>b.y-a.y).slice(0,10),topFouls=[...data].sort((a,b)=>b.f-a.f).slice(0,10);
   drawChart("cards-chart",topCards.map(x=>x.name),topCards.map(x=>x.y),"Żółte kartki w sezonie","#e8bd4d");
   drawChart("fouls-chart",topFouls.map(x=>x.name),topFouls.map(x=>x.f),"Faule w sezonie","#6aa7ff");
@@ -298,14 +300,14 @@ function analyze(){
   const pct=n=>`${(n*100).toFixed(1).replace(".",",")}%`;
   const level=high>=.55?"Wysokie ryzyko dużej liczby kartek":high>=.35?"Umiarkowane ryzyko dużej liczby kartek":"Niskie ryzyko dużej liczby kartek";
   const historyCount=Math.min(home.m,away.m);
-  out.innerHTML=`<div class="comparison"><div>${crest(home.name,home.logo)}<small>GOSPODARZE</small><b>${esc(home.name)}</b><span>${home.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${home.m} meczów z danymi</small></div><div class="comparison-vs">VS</div><div>${crest(away.name,away.logo)}<small>GOŚCIE</small><b>${esc(away.name)}</b><span>${away.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${away.m} meczów z danymi</small></div></div>
+  out.innerHTML=`<div class="comparison"><div>${crest(home.name,home.logo)}<small>GOSPODARZE</small><b>${esc(home.name)}</b><span>${home.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${home.m} meczów z danymi</small><small>${home.fAvg.toFixed(2).replace(".",",")} fauli / mecz</small></div><div class="comparison-vs">VS</div><div>${crest(away.name,away.logo)}<small>GOŚCIE</small><b>${esc(away.name)}</b><span>${away.yAvg.toFixed(2).replace(".",",")} <i>żółtych / mecz</i></span><small>${away.m} meczów z danymi</small><small>${away.fAvg.toFixed(2).replace(".",",")} fauli / mecz</small></div></div>
   <div class="risk-meter"><div><small>PROGNOZA NA PODSTAWIE SEZONU</small><b>${level}</b></div><div class="meter-track"><i style="width:${Math.min(100,high*100)}%"></i></div></div>
   <div class="probability-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0;">
     <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>MAŁO KARTEK (0–3)</small><strong style="font-size:28px;color:#28d9bd;">${pct(lowThree)}</strong></div>
     <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>ŚREDNIO (4)</small><strong style="font-size:28px;color:#e8bd4d;">${pct(exactlyFour)}</strong></div>
     <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>DUŻO KARTEK (5+)</small><strong style="font-size:28px;color:#ff7185;">${pct(high)}</strong></div>
   </div>
-  <p class="disclaimer">Szacunek modelowy Poissona. Oparty na średniej liczbie żółtych kartek obu drużyn w bieżącym sezonie (${home.m} i ${away.m} meczów z danymi). Nie jest gwarancją wyniku ani poradą bukmacherską.</p>`;
+  <p class="disclaimer">Szacunek modelowy Poissona. Oparty na średniej liczbie żółtych kartek obu drużyn w bieżącym sezonie (${home.m} i ${away.m} meczów z danymi). Faule pokazujemy jako sumę średnich drużyn. Statystyki sędziego zostaną uwzględnione dopiero po uzyskaniu potwierdzonego identyfikatora arbitra i jego historii. Nie jest to gwarancja wyniku ani porada bukmacherska.</p>`;
 }
 async function refreshAll(){
   if(state.busy)return;state.busy=true;
