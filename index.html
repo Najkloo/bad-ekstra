@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080d18">
+  <meta name="description" content="Ekstraklasa Insight — wyniki na żywo, tabela, terminarz i statystyki polskiej ligi.">
+  <title>Ekstraklasa Insight — centrum danych</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+<header class="topbar">
+  <a class="brand" href="#home"><span class="brand-mark">EI</span><span>EKSTRAKLASA <b>INSIGHT</b><small>FOOTBALL DATA PLATFORM</small></span></a>
+  <nav class="main-nav" aria-label="Główna nawigacja">
+    <a class="nav-link active" href="#home">Przegląd</a><a class="nav-link" href="#standings">Tabela</a><a class="nav-link" href="#fixtures">Terminarz</a><a class="nav-link" href="#statistics">Statystyki</a><a class="nav-link" href="#referees">Sędziowie</a><a class="nav-link" href="#analyzer">Analizator</a>
+  </nav>
+  <div class="top-actions"><span class="live-indicator"><i></i> SYSTEM ONLINE</span><button class="icon-btn" id="settings-open" aria-label="Ustawienia">⚙</button><button class="mobile-menu" id="mobile-menu">☰</button></div>
+</header>
+<main id="home">
+  <section class="hero wrap">
+    <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> SEZON 2026 / 2027 <span class="live-tag">LIVE DATA</span></div>
+      <h1>Więcej niż<br><em>piłkarskie</em> wyniki.</h1>
+      <p>Statystyki, forma, dyscyplina i terminarz PKO BP Ekstraklasy. Wszystko w jednym miejscu — aktualizowane na podstawie danych meczowych.</p>
+      <div class="hero-ctas"><a class="btn btn-primary" href="#standings">Sprawdź tabelę <span>↗</span></a><a class="btn btn-ghost" href="#analyzer">Analizuj mecz <span>→</span></a></div>
+    </div>
+    <div class="hero-visual"><div class="orb orb-a"></div><div class="orb orb-b"></div><div class="hero-ring"></div><div class="hero-ball">⚽</div><div class="hero-stat stat-top"><small>ROZGRYWKI</small><b>PKO BP</b><span>EKSTRAKLASA</span></div><div class="hero-stat stat-bottom"><small>SEZON</small><b>26/27</b><span>POLSKA • 1. LIGA</span></div><div class="hero-cross">+</div></div>
+  </section>
+  <section class="wrap score-strip">
+    <div class="section-kicker"><span class="pulse"></span> MECZE NA ŻYWO / NAJBLIŻSZE</div><div id="live-matches" class="live-matches"><div class="loading-line">Pobieranie aktualnych spotkań…</div></div>
+  </section>
+  <section class="wrap section" id="standings">
+    <div class="section-heading"><div><div class="eyebrow">01 / KLASYFIKACJA</div><h2>Tabela <em>ligowa</em></h2><p>Aktualna klasyfikacja drużyn w sezonie.</p></div><div class="heading-meta"><span class="data-dot"></span><span id="standings-updated">Oczekiwanie na dane</span></div></div>
+    <div class="panel table-panel"><div class="panel-top"><div><b>PKO BP Ekstraklasa</b><small>SEZON 2026/2027</small></div><span class="tag">OFICJALNE DANE API</span></div><div class="table-scroll"><table><thead><tr><th>#</th><th>DRUŻYNA</th><th>M</th><th>W</th><th>R</th><th>P</th><th>Bramki</th><th>+/−</th><th>PKT</th><th>FORMA</th></tr></thead><tbody id="standings-body"><tr><td colspan="10" class="empty">Ładowanie tabeli…</td></tr></tbody></table></div></div>
+  </section>
+  <section class="wrap section" id="fixtures">
+    <div class="section-heading"><div><div class="eyebrow">02 / KALENDARZ</div><h2>Terminarz <em>spotkań</em></h2><p>Wyniki zakończonych spotkań i nadchodzące kolejki.</p></div><div class="date-controls"><button class="icon-btn" id="date-prev">←</button><input type="date" id="fixture-date"><button class="icon-btn" id="date-next">→</button></div></div>
+    <div class="fixtures-layout"><div class="panel fixtures-panel"><div class="panel-top"><div><b id="fixtures-title">Mecze</b><small id="fixtures-subtitle">WYBRANY DZIEŃ</small></div><span class="tag" id="fixture-count">0 SPOTKAŃ</span></div><div id="fixtures-list" class="fixtures-list"><div class="empty">Ładowanie terminarza…</div></div></div>
+    <aside class="panel calendar-panel"><div class="panel-top"><div><b>Kalendarz</b><small>SZYBKI WYBÓR DATY</small></div><span class="calendar-icon">▦</span></div><div class="calendar-month"><button id="month-prev">‹</button><b id="month-label">—</b><button id="month-next">›</button></div><div class="calendar-grid" id="calendar-grid"></div><div class="calendar-legend"><span><i></i> Dzień z meczem</span><span><i class="selected-dot"></i> Wybrany dzień</span></div></aside></div>
+  </section>
+  <section class="wrap section" id="statistics">
+    <div class="section-heading"><div><div class="eyebrow">03 / ANALITYKA</div><h2>Liczby <em>nie kłamią.</em></h2><p>Statystyki dyscyplinarne i meczowe na podstawie dostępnych danych.</p></div></div>
+    <div class="stats-grid">
+      <article class="panel stat-panel"><div class="panel-top"><div><b>Kartki drużyn</b><small>ŻÓŁTE / CZERWONE</small></div><span class="stat-icon yellow">▰</span></div><div class="chart-wrap"><canvas id="cards-chart"></canvas></div><div id="cards-chart-note" class="chart-note">Dane zostaną pokazane, gdy API udostępni statystyki meczów.</div></article>
+      <article class="panel stat-panel"><div class="panel-top"><div><b>Faule drużyn</b><small>ŚREDNIA NA MECZ</small></div><span class="stat-icon blue">⌁</span></div><div class="chart-wrap"><canvas id="fouls-chart"></canvas></div><div id="fouls-chart-note" class="chart-note">Wykres na podstawie statystyk zakończonych spotkań.</div></article>
+    </div>
+    <div class="panel discipline-panel"><div class="panel-top"><div><b>Ranking dyscypliny</b><small>ZAGREGOWANE STATYSTYKI DRUŻYN</small></div><span class="tag">DANE MECZOWE</span></div><div class="table-scroll"><table><thead><tr><th>#</th><th>DRUŻYNA</th><th>ŻÓŁTE</th><th>CZERWONE</th><th>FAULE</th><th>MECZE W PRÓBIE</th></tr></thead><tbody id="discipline-body"><tr><td colspan="6" class="empty">Oczekiwanie na dane meczowe…</td></tr></tbody></table></div></div>
+  </section>
+  <section class="wrap section" id="referees">
+    <div class="section-heading"><div><div class="eyebrow">04 / ARBITERZY</div><h2>Pod <em>gwizdkiem.</em></h2><p>Panel sędziowski — tylko dane faktycznie udostępnione przez dostawcę API.</p></div></div>
+    <div class="referee-grid"><div class="panel referee-feature"><div class="referee-watermark">⚖</div><div class="eyebrow">CENTRUM SĘDZIOWSKIE</div><h3>Analiza pracy<br>arbitrów.</h3><p>Średnia liczba kartek, odgwizdanych fauli i liczba prowadzonych spotkań wymagają osobnego zestawienia sędziów w źródle danych.</p><span class="tag tag-muted">WERYFIKACJA DOSTĘPNOŚCI</span></div><div class="panel referee-status"><div class="status-icon">i</div><h3>Statystyki sędziów</h3><p id="referee-status">SportAPI.ai udostępnia statystyki drużyn i zdarzenia meczowe, ale dokumentacja nie potwierdza osobnego rankingu sędziów. Nie będziemy wyświetlać wymyślonych wartości.</p><a href="https://sportapi.ai/docs" target="_blank" rel="noreferrer">Dokumentacja dostawcy ↗</a></div></div>
+  </section>
+  <section class="wrap section analyzer-section" id="analyzer">
+    <div class="section-heading"><div><div class="eyebrow">05 / MATCH LAB</div><h2>Analizator <em>meczu.</em></h2><p>Porównaj zespoły i oszacuj dyscyplinarny profil spotkania.</p></div><span class="tag">BETA / MODEL OPISOWY</span></div>
+    <div class="panel analyzer-panel"><div class="analyzer-intro"><div class="analyzer-symbol">✳</div><div><b>Match Risk Analyzer</b><small>Wybierz drużyny, aby porównać dostępne dane.</small></div></div>
+      <div class="team-selectors"><label>GOSPODARZE<select id="home-team"><option value="">Wybierz drużynę</option></select></label><div class="versus">VS</div><label>GOŚCIE<select id="away-team"><option value="">Wybierz drużynę</option></select></label></div>
+      <div class="analyzer-result" id="analyzer-result"><div class="result-placeholder">Wybierz dwie drużyny, aby zobaczyć porównanie.</div></div>
+      <p class="disclaimer">Wskaźnik jest opisowym porównaniem średnich statystyk z dostępnej próby, a nie prawdopodobieństwem zdarzenia ani poradą bukmacherską. Nie uwzględnia arbitra, jeśli brak jego zweryfikowanych danych.</p>
+    </div>
+  </section>
+  <section class="wrap footer-cta"><div><div class="eyebrow">EKSTRAKLASA INSIGHT / 2026—27</div><h2>Gra zaczyna się<br><em>od danych.</em></h2></div><a class="btn btn-primary" href="#home">Wróć na górę ↑</a></section>
+</main>
+<footer class="footer wrap"><span>© 2026 EKSTRAKLASA INSIGHT</span><span>Projekt niezależny. Nie jest oficjalnym serwisem Ekstraklasy.</span><span>DANE: SPORTAPI.AI</span></footer>
+<div class="toast" id="toast"></div>
+<div class="modal-backdrop" id="settings-modal"><div class="modal panel"><button class="modal-close" id="settings-close">×</button><div class="eyebrow">KONFIGURACJA API</div><h2>Połącz <em>źródło danych.</em></h2><p>Wklej klucz SportAPI.ai. Klucz zostanie zapisany wyłącznie w pamięci tej przeglądarki.</p><label class="api-label">KLUCZ API<input id="api-key-input" type="password" placeholder="sk_live_..." autocomplete="off"></label><div class="modal-warning">Uwaga: w wersji GitHub Pages połączenie odbywa się bezpośrednio z przeglądarki. Nie umieszczaj klucza na stałe w publicznym pliku JavaScript. Każdy użytkownik powinien użyć własnego klucza albo skonfiguruj pośredniczący backend.</div><div class="modal-actions"><button class="btn btn-ghost" id="clear-key">Usuń klucz</button><button class="btn btn-primary" id="save-key">Zapisz i pobierz dane</button></div><a href="https://sportapi.ai/dashboard" target="_blank" rel="noreferrer">Otwórz panel SportAPI.ai ↗</a></div></div>
+<div class="mobile-nav" id="mobile-nav"><a href="#home">Przegląd</a><a href="#standings">Tabela</a><a href="#fixtures">Terminarz</a><a href="#statistics">Statystyki</a><a href="#referees">Sędziowie</a><a href="#analyzer">Analizator</a></div>
+<script src="config.js"></script><script src="app.js"></script>
+</body></html>
