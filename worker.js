@@ -80,7 +80,8 @@ export default {
 
       if (upstream.ok) {
         const cacheHeaders = new Headers(headers);
-        cacheHeaders.set("Cache-Control", "public, max-age=120");
+        const isHistoricalData = path.includes("/stats") || (path.includes("/fixtures/date/") && path.slice(-10) < new Date().toISOString().slice(0,10));
+        cacheHeaders.set("Cache-Control", `public, max-age=${isHistoricalData ? 21600 : 60}`);
         ctx.waitUntil(cache.put(cacheKey, new Response(body, {
           status: upstream.status, headers: cacheHeaders
         })));

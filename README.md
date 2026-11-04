@@ -18,7 +18,7 @@ Statyczna strona analityczna dotycząca PKO BP Ekstraklasy, zbudowana w HTML, CS
 5. Workflow uruchomi się automatycznie po wypchnięciu plików na `main`. Wynik sprawdzisz w zakładce **Actions**.
 
 ## API
-Klucz API wpisuje się w ustawieniach strony. Nie umieszczaj klucza w `config.js`, `app.js` ani w repozytorium publicznym. W tej wersji klucz jest przechowywany w `sessionStorage` przeglądarki.
+Klucz API jest przechowywany jako sekret `SPORTAPI_KEY` w Cloudflare Worker. Nie umieszczaj go w repozytorium ani w plikach frontendowych.
 
 `config.js` zawiera adres bazowy i limity pobierania. Ścieżki API używane w `app.js` wymagają potwierdzenia z aktualną dokumentacją i dostępem SportAPI.ai. Sama publikacja strony nie potwierdza poprawności ani dostępności tych endpointów. Jeśli dostawca zmienił schemat odpowiedzi, trzeba będzie dostosować mapowanie danych.
 
@@ -31,8 +31,16 @@ Klucz API wpisuje się w ustawieniach strony. Nie umieszczaj klucza w `config.js
 ## Połączenie z SportAPI.ai przez Cloudflare Worker
 1. Worker `ekstraklasa-api` powinien mieć sekret `SPORTAPI_KEY` w środowisku Production.
 2. W Workerze ustaw kod z pliku `worker.js` i wdroż go.
-3. `config.js` wskazuje na `https://ekstraklasa-api.mateuszgornicki3.workers.dev`.
+3. `config.js` wskazuje na `https://ekstraklasa-api.mateuszgornicki3.workers.dev/api`.
 4. Wgraj zaktualizowane `index.html`, `app.js` i `config.js` do repozytorium `bad-ekstra` i zatwierdź zmiany.
 5. Po wdrożeniu sprawdź `https://ekstraklasa-api.mateuszgornicki3.workers.dev/api/leagues` w przeglądarce. Odpowiedź 401/403 oznacza problem z kluczem/uprawnieniami; odpowiedź JSON z danymi oznacza, że pośrednik odpowiada. Następnie sprawdź stronę.
 
 Uwaga: endpointy i formaty odpowiedzi dostawcy muszą być zgodne z aktualną dokumentacją SportAPI.ai. Jeżeli API zwróci inne pola niż zakłada frontend, konieczne będzie dopasowanie mapowania.
+
+
+## Statystyki sezonowe
+- Ranking kartek i fauli pobiera zakończone mecze od 1 lipca bieżącego sezonu do dnia uruchomienia.
+- Dla każdego zakończonego spotkania pobierane są statystyki meczu; liczby w tabeli są sumami sezonowymi, a wykresy pokazują TOP 10 drużyn.
+- To oznacza większą liczbę zapytań do API podczas pierwszego ładowania. Przy obecnym limicie 2 000 zapytań dziennie pobranie sezonu powinno mieścić się w limicie, ale zależy od liczby rozegranych spotkań i limitów dostawcy.
+- W terminarzu statystyki kartek i fauli są dociągane dla zakończonych lub trwających spotkań, jeśli dostawca je udostępnia.
+- Herby są wyświetlane, gdy API zwraca adres logo drużyny; w przeciwnym razie widoczny jest skrót nazwy.

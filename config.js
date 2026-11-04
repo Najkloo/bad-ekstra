@@ -1,5 +1,4 @@
-
-/* Konfiguracja Ekstraklasa Insight */
+/* Konfiguracja publiczna. Klucz API pozostaje sekretem w Cloudflare Worker. */
 window.APP_CONFIG = {
   API_BASE: "https://ekstraklasa-api.mateuszgornicki3.workers.dev/api",
   LEAGUE_NAME: "Ekstraklasa",
