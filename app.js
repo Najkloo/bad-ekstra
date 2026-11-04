@@ -1,16 +1,27 @@
 (() => {
 "use strict";
 const $ = s => document.querySelector(s);
-const state = {key:sessionStorage.getItem("ei_api_key")||"", leagueId:null, teams:[], standings:[], fixtures:[], discipline:[], month:new Date(), selectedDate:new Date(), charts:{}, busy:false};
+const state = {leagueId:null, teams:[], standings:[], fixtures:[], discipline:[], month:new Date(), selectedDate:new Date(), charts:{}, busy:false};
 const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num = v => Number.isFinite(Number(v))?Number(v):0;
 const toast = msg => {const el=$("#toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),3200)};
 const api = async path => {
-  if(!state.key) throw new Error("Dodaj klucz API w ustawieniach.");
-  const r=await fetch(`${APP_CONFIG.API_BASE}${path}`,{headers:{"X-Api-Key":state.key}});
-  let j; try{j=await r.json()}catch{throw new Error("API zwróciło nieprawidłową odpowiedź.");}
-  if(!r.ok || j.success===false) throw new Error(j.message||j.error||`Błąd API (${r.status}).`);
+  let r;
+  try {
+    r = await fetch(`${APP_CONFIG.API_BASE}${path}`, {
+      method: "GET",
+      headers: { "Accept": "application/json" }
+    });
+  } catch (error) {
+    throw new Error("Nie udało się połączyć z pośrednikiem API. Sprawdź wdrożenie Cloudflare Worker.");
+  }
+  let j;
+  try { j = await r.json(); }
+  catch { throw new Error(`Worker zwrócił nieprawidłową odpowiedź (HTTP ${r.status}).`); }
+  if (!r.ok || j.success === false) {
+    throw new Error(j.message || j.error || `Błąd API (${r.status}).`);
+  }
   return j;
 };
 const unwrap = j => Array.isArray(j?.data)?j.data:Array.isArray(j?.fixtures)?j.fixtures:[];
@@ -88,7 +99,7 @@ function renderDiscipline(){
  body.innerHTML=data.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><div class="team-cell"><span class="team-crest">${esc(x.name.slice(0,2).toUpperCase())}</span><b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td></tr>`).join("");
  drawChart("cards-chart",data.slice(0,8).map(x=>x.name),data.slice(0,8).map(x=>x.y),"Żółte kartki","#e8bd4d");
  drawChart("fouls-chart",data.slice(0,8).map(x=>x.name),data.slice(0,8).map(x=>Math.round(x.f/x.m*10)/10),"Faule / mecz","#6aa7ff");
- $("#cards-chart-note").textContent=`Próba: maks. ${matchesLabel(data)} wystąpień drużyn z ostatnich pobranych meczów.`;
+ $("#cards-chart-note").textContent=`Próba: do ${matchesLabel(data)} meczów na drużynę w pobranej próbce.`;
  $("#fouls-chart-note").textContent="Średnia liczba fauli na mecz w dostępnej próbie.";
 }
 function matchesLabel(d){return Math.max(...d.map(x=>x.m),0)}
@@ -109,8 +120,7 @@ function analyze(){
 async function refreshAll(){
  if(state.busy)return;state.busy=true;
  try{
-  if(!state.key){$("#live-matches").innerHTML='<div class="no-live">Dodaj klucz SportAPI.ai w ustawieniach, aby uruchomić dane na żywo.</div>';showError("Dodaj klucz API w ustawieniach, aby pobrać tabelę.");return}
-  $("#live-matches").innerHTML='<div class="loading-line">Łączenie z SportAPI.ai…</div>';
+  $("#live-matches").innerHTML='<div class="loading-line">Łączenie z bezpiecznym pośrednikiem SportAPI.ai…</div>';
   if(!state.leagueId)await findLeague();
   await Promise.all([loadStandings(),loadLive(),loadFixtures(state.selectedDate)]);
   await loadDiscipline();
@@ -126,16 +136,15 @@ function init(){
  $("#month-prev").onclick=()=>{state.month.setMonth(state.month.getMonth()-1);loadCalendarMonth()};
  $("#month-next").onclick=()=>{state.month.setMonth(state.month.getMonth()+1);loadCalendarMonth()};
  $("#home-team").onchange=analyze;$("#away-team").onchange=analyze;
- $("#settings-open").onclick=()=>{$("#api-key-input").value=state.key;$("#settings-modal").classList.add("open")};
+ $("#settings-open").onclick=()=>$("#settings-modal").classList.add("open");
  $("#settings-close").onclick=()=>$("#settings-modal").classList.remove("open");
  $("#settings-modal").onclick=e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("open")};
- $("#save-key").onclick=()=>{const k=$("#api-key-input").value.trim();if(!k){toast("Wklej klucz API.");return}state.key=k;sessionStorage.setItem("ei_api_key",k);state.leagueId=null;$("#settings-modal").classList.remove("open");refreshAll()};
- $("#clear-key").onclick=()=>{state.key="";sessionStorage.removeItem("ei_api_key");$("#api-key-input").value="";toast("Klucz usunięty z tej sesji.")};
+ $("#save-key").onclick=()=>{state.leagueId=null;$("#settings-modal").classList.remove("open");refreshAll()};
  $("#mobile-menu").onclick=()=>$("#mobile-nav").classList.toggle("open");
  $("#mobile-nav").querySelectorAll("a").forEach(a=>a.onclick=()=>$("#mobile-nav").classList.remove("open"));
  document.querySelectorAll(".nav-link").forEach(a=>a.addEventListener("click",()=>{document.querySelectorAll(".nav-link").forEach(n=>n.classList.remove("active"));a.classList.add("active")}));
  loadCalendarMonth();
- if(state.key)refreshAll();else{$("#live-matches").innerHTML='<div class="no-live">Dodaj klucz API w ⚙ ustawieniach, aby zobaczyć dane Ekstraklasy.</div>';$("#standings-body").innerHTML='<tr><td colspan="10" class="empty">Połącz API, aby załadować aktualną tabelę.</td></tr>'}
+ refreshAll();
 }
 document.addEventListener("DOMContentLoaded",init);
 })();

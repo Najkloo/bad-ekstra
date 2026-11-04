@@ -26,3 +26,13 @@ Klucz API wpisuje się w ustawieniach strony. Nie umieszczaj klucza w `config.js
 - To frontend statyczny; nie wymaga Node.js, npm ani procesu build.
 - Analiza dyscyplinarna jest opisową heurystyką na podstawie dostępnej próbki, a nie prognozą prawdopodobieństwa.
 - Statystyki sędziów nie są prezentowane jako potwierdzone, jeśli API ich nie udostępnia.
+
+
+## Połączenie z SportAPI.ai przez Cloudflare Worker
+1. Worker `ekstraklasa-api` powinien mieć sekret `SPORTAPI_KEY` w środowisku Production.
+2. W Workerze ustaw kod z pliku `worker.js` i wdroż go.
+3. `config.js` wskazuje na `https://ekstraklasa-api.mateuszgornicki3.workers.dev`.
+4. Wgraj zaktualizowane `index.html`, `app.js` i `config.js` do repozytorium `bad-ekstra` i zatwierdź zmiany.
+5. Po wdrożeniu sprawdź `https://ekstraklasa-api.mateuszgornicki3.workers.dev/api/leagues` w przeglądarce. Odpowiedź 401/403 oznacza problem z kluczem/uprawnieniami; odpowiedź JSON z danymi oznacza, że pośrednik odpowiada. Następnie sprawdź stronę.
+
+Uwaga: endpointy i formaty odpowiedzi dostawcy muszą być zgodne z aktualną dokumentacją SportAPI.ai. Jeżeli API zwróci inne pola niż zakłada frontend, konieczne będzie dopasowanie mapowania.
