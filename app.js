@@ -262,29 +262,6 @@ async function loadSeasonDiscipline(){
   state.seasonStatsLoaded=true;renderDiscipline();renderFixtures();
   try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline,cardMatchTotals}));}catch(e){}
 }
-
-async function loadRefereeStats(){
-  const body=$("#referees-body"),status=$("#referee-status"),updated=$("#referee-updated");
-  if(!body)return;
-  try{
-    const snapshot=await api("/referees");
-    const rows=Array.isArray(snapshot.referees)?snapshot.referees:[];
-    if(!rows.length)throw new Error("Brak rekordów sędziowskich w zapisanej odpowiedzi.");
-    body.innerHTML=rows.sort((a,b)=>(Number(b.matches)||0)-(Number(a.matches)||0)).map((r,i)=>{
-      const m=Number(r.matches)||0,y=Number(r.yellowCards)||0,f=Number(r.fouls)||0;
-      return `<tr><td class="rank">${i+1}</td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
-    }).join("");
-    const date=new Date(snapshot.fetchedAt);
-    status.textContent=`Pobrano ${rows.length} profili sędziowskich. Źródło: Zawód Typer.`;
-    updated.textContent=`Ostatnia synchronizacja: ${date.toLocaleString("pl-PL")} • harmonogram: co 6 godzin`;
-    $("#referee-period").textContent=`SEZON ${rows[0]?.season||"—"} • ${rows.length} SĘDZIÓW`;
-  }catch(error){
-    body.innerHTML=`<tr><td colspan="9" class="empty">${esc(error.message||"Nie udało się pobrać statystyk sędziów.")}</td></tr>`;
-    status.textContent="Dane sędziowskie nie są jeszcze dostępne. Ostatni poprawny zapis pozostaje zachowany po stronie serwera.";
-    updated.textContent="Aktualizacja zaplanowana co 6 godzin po skonfigurowaniu importu.";
-  }
-}
-
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
   if(!data.length){body.innerHTML='<tr><td colspan="9" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
@@ -359,7 +336,7 @@ function init(){
   $("#mobile-menu").onclick=()=>$("#mobile-nav").classList.toggle("open");
   $("#mobile-nav").querySelectorAll("a").forEach(a=>a.onclick=()=>$("#mobile-nav").classList.remove("open"));
   document.querySelectorAll(".nav-link").forEach(a=>a.addEventListener("click",()=>{document.querySelectorAll(".nav-link").forEach(n=>n.classList.remove("active"));a.classList.add("active");}));
-  loadCalendarMonth();refreshAll();loadRefereeStats();
+  loadCalendarMonth();refreshAll();
 }
 document.addEventListener("DOMContentLoaded",init);
 })();
