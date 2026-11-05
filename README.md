@@ -1,73 +1,25 @@
 # Ekstraklasa Insight
 
-Statyczna strona analityczna dotycząca PKO BP Ekstraklasy, zbudowana w HTML, CSS i Vanilla JavaScript.
+Statyczna strona analityczna PKO BP Ekstraklasy (HTML, CSS, Vanilla JavaScript) oraz Cloudflare Worker jako bezpieczny proxy API.
 
-## Pliki
-- `index.html` – struktura strony
-- `style.css` – wygląd i responsywność
-- `app.js` – logika interfejsu i pobieranie danych
-- `config.js` – konfiguracja API
-- `.github/workflows/deploy.yml` – automatyczne wdrażanie na GitHub Pages
-- `.nojekyll` – wyłącza przetwarzanie Jekyll
+## Źródła danych
+- **SportAPI.ai** pozostaje głównym źródłem tabeli, terminarza, wyników i statystyk drużyn. Wymagany sekret Cloudflare: `SPORTAPI_KEY`.
+- **Zawód Typer** jest przygotowany jako osobne źródło statystyk sędziowskich. Worker odczytuje zapisany snapshot przez `GET /api/referees`; zadanie Cron pobiera dane co 6 godzin.
+- SoccersAPI zostało usunięte z kodu i konfiguracji.
 
-## Publikacja na GitHub Pages
-1. Utwórz nowe repozytorium i ustaw domyślną gałąź `main`.
-2. Wgraj całą zawartość tego archiwum, łącznie z folderem `.github` i plikiem `.nojekyll`, do katalogu głównego repozytorium.
-3. W repozytorium otwórz **Settings → Pages**.
-4. W polu **Build and deployment → Source** wybierz **GitHub Actions**.
-5. Workflow uruchomi się automatycznie po wypchnięciu plików na `main`. Wynik sprawdzisz w zakładce **Actions**.
+## Konfiguracja Cloudflare
+1. Wgraj `worker.js` do Workera `ekstraklasa-api`.
+2. Zachowaj sekret `SPORTAPI_KEY` w środowisku Production.
+3. Utwórz KV namespace, np. `EKSTRA_REFEREES`, i dodaj binding o nazwie `REFEREE_KV`.
+4. Dodaj zmienną środowiskową `ZAWOD_TYPER_LEAGUE_ID` z potwierdzonym identyfikatorem ligi Ekstraklasy. Nie wpisuj `140` z przykładowego podglądu — tamte dane zawierały hiszpańskich arbitrów.
+5. W ustawieniach Worker → Triggers → Cron Triggers dodaj `0 */6 * * *` (UTC).
+6. Zaktualizuj pliki frontendu w repozytorium GitHub Pages.
 
-## API
-Klucz API jest przechowywany jako sekret `SPORTAPI_KEY` w Cloudflare Worker. Nie umieszczaj go w repozytorium ani w plikach frontendowych.
+## Ważne przed uruchomieniem importu
+`NP_ajax.php` jest wewnętrznym, nieudokumentowanym endpointem używanym przez stronę Zawód Typer. Kod integracji jest przygotowany, ale automatyczne wykorzystanie tego endpointu w zewnętrznym projekcie należy uruchomić dopiero po potwierdzeniu warunków/licencji przez właściciela serwisu oraz ustaleniu prawidłowego `league_id` dla Ekstraklasy. Do tego czasu nie ustawiaj Cron Triggera ani identyfikatora ligi. Nie obchodzimy zabezpieczeń, logowania ani limitów serwisu.
 
-`config.js` zawiera adres bazowy i limity pobierania. Ścieżki API używane w `app.js` wymagają potwierdzenia z aktualną dokumentacją i dostępem SportAPI.ai. Sama publikacja strony nie potwierdza poprawności ani dostępności tych endpointów. Jeśli dostawca zmienił schemat odpowiedzi, trzeba będzie dostosować mapowanie danych.
+## Zachowanie danych
+Cron zapisuje nowy snapshot dopiero po otrzymaniu poprawnej, niepustej tablicy rekordów. Przy błędzie poprzedni snapshot w KV pozostaje bez zmian. Frontend nie odpytuje Zawód Typer bezpośrednio.
 
-## Ważne
-- To frontend statyczny; nie wymaga Node.js, npm ani procesu build.
-- Analiza dyscyplinarna jest opisową heurystyką na podstawie dostępnej próbki, a nie prognozą prawdopodobieństwa.
-- Statystyki sędziów nie są prezentowane jako potwierdzone, jeśli API ich nie udostępnia.
-
-
-## Połączenie z SportAPI.ai przez Cloudflare Worker
-1. Worker `ekstraklasa-api` powinien mieć sekret `SPORTAPI_KEY` w środowisku Production.
-2. W Workerze ustaw kod z pliku `worker.js` i wdroż go.
-3. `config.js` wskazuje na `https://ekstraklasa-api.mateuszgornicki3.workers.dev/api`.
-4. Wgraj zaktualizowane `index.html`, `app.js` i `config.js` do repozytorium `bad-ekstra` i zatwierdź zmiany.
-5. Po wdrożeniu sprawdź `https://ekstraklasa-api.mateuszgornicki3.workers.dev/api/leagues` w przeglądarce. Odpowiedź 401/403 oznacza problem z kluczem/uprawnieniami; odpowiedź JSON z danymi oznacza, że pośrednik odpowiada. Następnie sprawdź stronę.
-
-Uwaga: endpointy i formaty odpowiedzi dostawcy muszą być zgodne z aktualną dokumentacją SportAPI.ai. Jeżeli API zwróci inne pola niż zakłada frontend, konieczne będzie dopasowanie mapowania.
-
-
-## Statystyki sezonowe
-- Ranking kartek i fauli pobiera zakończone mecze od 1 lipca bieżącego sezonu do dnia uruchomienia.
-- Dla każdego zakończonego spotkania pobierane są statystyki meczu; liczby w tabeli są sumami sezonowymi, a wykresy pokazują TOP 10 drużyn.
-- To oznacza większą liczbę zapytań do API podczas pierwszego ładowania. Przy obecnym limicie 2 000 zapytań dziennie pobranie sezonu powinno mieścić się w limicie, ale zależy od liczby rozegranych spotkań i limitów dostawcy.
-- W terminarzu statystyki kartek i fauli są dociągane dla zakończonych lub trwających spotkań, jeśli dostawca je udostępnia.
-- Herby są wyświetlane, gdy API zwraca adres logo drużyny; w przeciwnym razie widoczny jest skrót nazwy.
-
-## Dodatkowe źródło sędziowskie – SoccersAPI
-
-SportAPI.ai pozostaje głównym dostawcą tabeli, terminarza, wyników i statystyk drużyn. SoccersAPI jest dodatkowym źródłem przeznaczonym do profili sędziów i późniejszego łączenia arbitrów z meczami.
-
-### Konfiguracja sekretu
-
-W Cloudflare → Workers & Pages → `ekstraklasa-api` → Settings → Variables and Secrets dodaj sekret:
-
-- Name: `SOCCERS_API_KEY`
-- Value: klucz z panelu SoccersAPI
-
-Nie umieszczaj klucza w `config.js`, `app.js` ani w repozytorium GitHub.
-
-### Bezpieczny proxy SoccersAPI
-
-Worker udostępnia ograniczone trasy proxy:
-
-- `/api/soccersapi/leagues?t=info&id=3060`
-- `/api/soccersapi/seasons?...`
-- `/api/soccersapi/fixtures?...`
-- `/api/soccersapi/referees?t=list`
-- `/api/soccersapi/referees?t=info&id=REFEREE_ID`
-
-Klucz jest dopisywany po stronie Workera. Trasy są cache'owane, aby ograniczyć zużycie darmowego limitu. Nie podawaj `api_key` w zapytaniu z przeglądarki.
-
-Integracja proxy jest przygotowana, ale właściwe wyliczanie statystyk sędziów wymaga pierwszego testu rzeczywistej odpowiedzi SoccersAPI dla sezonu Ekstraklasy (szczególnie pola `referee_id` i struktury statystyk meczu). Nie należy zakładać, że każdy mecz ma przypisanego sędziego.
+## Publikacja
+Frontend jest statyczny i nie wymaga Node.js ani procesu build. Worker wymaga `SPORTAPI_KEY`, bindingu KV `REFEREE_KV` oraz — po uzyskaniu zgody i weryfikacji — `ZAWOD_TYPER_LEAGUE_ID` i harmonogramu Cron.
