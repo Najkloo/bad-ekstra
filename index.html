@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#080d18">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
   <meta name="description" content="Ekstraklasa Insight — wyniki na żywo, tabela, terminarz i statystyki polskiej ligi.">
   <title>Ekstraklasa Insight — centrum danych</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,11 +14,11 @@
 <body>
 <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
 <header class="topbar">
-  <a class="brand" href="#home"><span class="brand-mark">EI</span><span>EKSTRAKLASA <b>INSIGHT</b><small>SYSTEM ANALIZ PIŁKARSKICH</small></span></a>
+  <a class="brand" href="#home" aria-label="Ekstraklasa Insight — strona główna"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 42 10v13c0 11-7.5 18-18 22C13.5 41 6 34 6 23V10L24 3Z" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m24 11 3.7 7.5 8.3 1.2-6 5.8 1.4 8.2-7.4-3.9-7.4 3.9 1.4-8.2-6-5.8 8.3-1.2L24 11Z" fill="currentColor"/><path d="M10 13 24 7l14 6" fill="none" stroke="#07131a" stroke-width="1.5" opacity=".5"/></svg></span><span>EKSTRAKLASA <b>INSIGHT</b><small>POLSKI SYSTEM ANALIZ PIŁKARSKICH</small></span></a>
   <nav class="main-nav" aria-label="Główna nawigacja">
     <a class="nav-link active" href="#home">Pulpit</a><a class="nav-link" href="#standings">Tabela</a><a class="nav-link" href="#fixtures">Terminarz i prognozy</a><a class="nav-link" href="#statistics">Analiza sezonu</a><a class="nav-link" href="#referees">Sędziowie</a>
   </nav>
-  <div class="top-actions"><span class="live-indicator"><i></i> SYSTEM AKTYWNY</span><button class="icon-btn" id="settings-open" aria-label="Ustawienia">⚙</button><button class="mobile-menu" id="mobile-menu">☰</button></div>
+  <div class="top-actions"><span class="live-indicator"><i></i> SYSTEM DZIAŁA</span><button class="icon-btn" id="settings-open" aria-label="Ustawienia">⚙</button><button class="mobile-menu" id="mobile-menu">☰</button></div>
 </header>
 <main id="home">
   <section class="hero wrap">
@@ -68,7 +69,7 @@
   </section>
   <section class="wrap footer-cta"><div><div class="eyebrow">EKSTRAKLASA INSIGHT / 2026—27</div><h2>Gra zaczyna się<br><em>od danych.</em></h2></div><a class="btn btn-primary" href="#home">Wróć na górę ↑</a></section>
 </main>
-<footer class="footer wrap"><span>© 2026 EKSTRAKLASA INSIGHT</span><span>Projekt niezależny. Nie jest oficjalnym serwisem Ekstraklasy.</span><span>DANE: SPORTAPI.AI</span></footer>
+<footer class="footer wrap"><span>© 2026 Mateusz Górnicki</span><span>Ekstraklasa Insight · Niezależny system analiz piłkarskich</span><span>DANE: SPORTAPI.AI · ZAWÓD TYPER</span></footer>
 <div class="toast" id="toast"></div>
 <div class="modal-backdrop" id="settings-modal"><div class="modal panel"><button class="modal-close" id="settings-close">×</button><div class="eyebrow">USTAWIENIA ŹRÓDEŁ DANYCH</div><h2>Źródła <em>danych.</em></h2><p>Połączenie ze SportAPI.ai odbywa się przez bezpieczny Cloudflare Worker. Klucz API nie jest wysyłany do przeglądarki ani przechowywany w publicznym repozytorium.</p><div class="modal-warning">Pośrednik API: ekstraklasa-api.mateuszgornicki3.workers.dev<br>Klucz SportAPI.ai jest przechowywany jako sekret w Cloudflare. Statystyki sędziów pochodzą z Zawód Typer.</div><div class="modal-actions"><button class="btn btn-primary" id="save-key">Sprawdź połączenie i odśwież dane</button></div><a href="https://sportapi.ai/dashboard" target="_blank" rel="noreferrer">Otwórz panel SportAPI.ai ↗</a></div></div>
 <div class="mobile-nav" id="mobile-nav"><a href="#home">Pulpit</a><a href="#standings">Tabela</a><a href="#fixtures">Terminarz i prognozy</a><a href="#statistics">Analiza sezonu</a><a href="#referees">Sędziowie</a></div>

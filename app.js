@@ -76,7 +76,8 @@ function renderStandings(){
     const t=r.team||r,name=teamName(t),logo=teamLogo(t),gd=num(r.goals_for)-num(r.goals_against);
     const raw=r.form,formText=typeof raw==="string"?raw:Array.isArray(raw)?raw.map(x=>typeof x==="string"?x:(x?.result||x?.outcome||x?.status||"")).join(""):raw&&typeof raw==="object"?String(raw.form||raw.results||raw.value||""):"";
     const form=formText.slice(-5).split("").map(x=>`<i class="form-${String(x).toLowerCase()}">${esc(x)}</i>`).join("");
-    return `<tr><td class="rank">${r.position||i+1}</td><td><div class="team-cell">${crest(name,logo)}<b>${esc(name)}</b></div></td><td>${num(r.played)}</td><td>${num(r.won)}</td><td>${num(r.draw)}</td><td>${num(r.lost)}</td><td>${num(r.goals_for)}:${num(r.goals_against)}</td><td class="${gd>0?"positive":gd<0?"negative":""}">${gd>0?"+":""}${gd}</td><td class="points">${num(r.points)}</td><td><div class="form-list">${form||"—"}</div></td></tr>`;
+    const pos=Number(r.position)||i+1;
+    return `<tr class="rank-row rank-${pos<=3?pos:"other"}"><td class="rank"><span>${pos}</span></td><td><div class="team-cell">${crest(name,logo)}<b>${esc(name)}</b></div></td><td>${num(r.played)}</td><td>${num(r.won)}</td><td>${num(r.draw)}</td><td>${num(r.lost)}</td><td>${num(r.goals_for)}:${num(r.goals_against)}</td><td class="${gd>0?"positive":gd<0?"negative":""}">${gd>0?"+":""}${gd}</td><td class="points">${num(r.points)}</td><td><div class="form-list">${form||"—"}</div></td></tr>`;
   }).join("");
 }
 function populateTeamSelects(){
@@ -312,14 +313,14 @@ function renderRefereeTable(){
   const rows=state.referees.filter(r=>!query||normalizePersonName(r.name).includes(query)).sort((a,b)=>(Number(b[fields[key]])||0)-(Number(a[fields[key]])||0));
   body.innerHTML=rows.map((r,i)=>{
       const m=Number(r.matches)||0,y=Number(r.yellowCards)||0,f=Number(r.fouls)||0;
-      return `<tr><td class="rank">${i+1}</td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
+      return `<tr class="rank-row rank-${i<3?i+1:"other"}"><td class="rank"><span>${i+1}</span></td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
     }).join("");
 }
 
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
   if(!data.length){body.innerHTML='<tr><td colspan="9" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
-  body.innerHTML=data.map((x,i)=>`<tr><td class="rank">${i+1}</td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td><td>${x.rAvg.toFixed(2)}</td><td>${x.fAvg.toFixed(2)}</td></tr>`).join("");
+  body.innerHTML=data.map((x,i)=>`<tr class="rank-row rank-${i<3?i+1:"other"}"><td class="rank"><span>${i+1}</span></td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td><td>${x.rAvg.toFixed(2)}</td><td>${x.fAvg.toFixed(2)}</td></tr>`).join("");
   const topCards=[...data].sort((a,b)=>b.y-a.y).slice(0,10),topFouls=[...data].sort((a,b)=>b.f-a.f).slice(0,10);
   drawChart("cards-chart",topCards.map(x=>x.name),topCards.map(x=>x.y),"Żółte kartki w sezonie","#e8bd4d");
   drawChart("fouls-chart",topFouls.map(x=>x.name),topFouls.map(x=>x.f),"Faule w sezonie","#6aa7ff");
