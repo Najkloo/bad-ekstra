@@ -2,7 +2,7 @@
 "use strict";
 const $ = s => document.querySelector(s);
 const state = {
-  leagueId:null, teams:[], standings:[], fixtures:[], discipline:[],
+  leagueId:null, teams:[], standings:[], fixtures:[], discipline:[], referees:[],
   month:new Date(), selectedDate:new Date(), charts:{}, busy:false,
   seasonStart:null, seasonEnd:null, seasonMatches:[], seasonStatsLoaded:false,
   fixtureStats:new Map(), crestById:new Map(), seasonCardMatchTotals:[]
@@ -91,6 +91,16 @@ async function fixturesForDate(date){
 async function loadFixtures(date){
   state.fixtures=await fixturesForDate(fmtDate(date));renderFixtures();renderCalendar();
 }
+function normalizePersonName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pl-PL").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();}
+function fixtureReferee(f){
+  const candidates=[f.referee,f.referee_name,f.refereeName,f.main_referee,f.official?.name,f.officials?.referee,f.referee?.name,f.referee?.display_name];
+  for(const item of candidates){const name=typeof item==="string"?item:item?.name||item?.display_name||item?.full_name;if(name&&String(name).trim())return String(name).trim();}
+  return "";
+}
+function findReferee(name){
+  const key=normalizePersonName(name);if(!key)return null;
+  return state.referees.find(r=>[r.name,...String(r.allNames||"").split(",")].some(n=>normalizePersonName(n)===key))||null;
+}
 function cardForecastForTeams(homeName, awayName){
   const norm=s=>String(s||"").trim().toLocaleLowerCase("pl-PL");
   const h=state.discipline.find(x=>norm(x.name)===norm(homeName));
@@ -107,17 +117,18 @@ function cardForecastForTeams(homeName, awayName){
   const foulsPerMatch=(Number(h.fAvg)||0)+(Number(a.fAvg)||0);
   return {lambda,high,low,mid,foulsPerMatch,sample:Math.min(h.m,a.m)};
 }
-function forecastMarkup(teams){
+function forecastMarkup(teams, refName=""){
   const f=cardForecastForTeams(teams.homeName,teams.awayName);
-  if(!f) return `<div class="fixture-forecast unavailable"><span class="forecast-label">PROGNOZA KARTEK</span><b>Brak wystarczających danych</b><small>Prognoza pojawi się po zebraniu statystyk sezonowych.</small></div>`;
+  if(!f) return `<div class="fixture-forecast unavailable"><span class="forecast-label">PROGNOZA KARTEK</span><b>Za mało danych do prognozy</b><small>Prognoza pojawi się po zebraniu statystyk sezonowych.</small></div>`;
   const pct=n=>`${Math.round(n*100)}%`;
-  const category=f.high>=.55?"Wysokie prawdopodobieństwo":f.high>=.35?"Umiarkowane prawdopodobieństwo":"Niskie prawdopodobieństwo";
+  const category=f.high>=.55?"Duże prawdopodobieństwo":f.high>=.35?"Umiarkowane prawdopodobieństwo":"Małe prawdopodobieństwo";
   const tone=f.high>=.55?"high":f.high>=.35?"medium":"low";
   return `<div class="fixture-forecast ${tone}">
     <div class="forecast-main"><span class="forecast-label">PROGNOZA ŻÓŁTYCH KARTEK</span><b>${category}</b><small>5 lub więcej kartek: ${pct(f.high)}</small></div>
     <div class="forecast-probs"><span><i class="dot low"></i> 0–3: <b>${pct(f.low)}</b></span><span><i class="dot mid"></i> 4: <b>${pct(f.mid)}</b></span><span><i class="dot high"></i> 5+: <b>${pct(f.high)}</b></span></div>
     <div class="forecast-fouls"><span>Szacunkowa suma fauli</span><b>${f.foulsPerMatch>0?f.foulsPerMatch.toFixed(1).replace(".",","):"Brak danych"}</b></div>
-    <small class="forecast-source">Na podstawie ${f.sample} meczów z danymi dla każdej drużyny. Suma fauli to suma średnich obu zespołów.</small>
+    <div class="forecast-referee">${(()=>{const r=findReferee(refName);return r?`<span>Wpływ sędziego: <b>${esc(r.name)}</b></span><span>${(Number(r.yellowCards||0)/Math.max(1,Number(r.matches)||0)).toFixed(2).replace(".",",")} żółtych / mecz</span><span>${(Number(r.fouls||0)/Math.max(1,Number(r.matches)||0)).toFixed(1).replace(".",",")} fauli / mecz</span>`:`<span>Statystyki sędziego nie są doliczane do prognozy, ponieważ obsada meczu nie jest potwierdzona w danych.</span>`;})()}</div>
+    <small class="forecast-source">Na podstawie ${f.sample} meczów z danymi dla każdej drużyny. Suma fauli to suma średnich obu zespołów. Statystyki sędziego pokazujemy oddzielnie i nie zmieniamy nimi prognozy bez potwierdzonej obsady.</small>
   </div>`;
 }
 function renderFixtures(){
@@ -127,7 +138,7 @@ function renderFixtures(){
   const el=$("#fixtures-list");
   if(!state.fixtures.length){el.innerHTML='<div class="empty empty-large">Brak spotkań Ekstraklasy w tym dniu.<br><small>Wybierz inną datę w kalendarzu.</small></div>';return;}
   el.innerHTML=state.fixtures.map(f=>{
-    const teams=fixtureTeams(f),live=isLive(f),done=isDone(f),dt=fixtureDateTime(f);
+    const teams=fixtureTeams(f),live=isLive(f),done=isDone(f),dt=fixtureDateTime(f),refName=fixtureReferee(f),refStats=findReferee(refName);
     const status=live?`<span class="match-live">${esc(f.minute?`${f.minute}'`:"NA ŻYWO")}</span>`:done?'<span class="match-done">ZAKOŃCZONY</span>':`<span class="match-time">${esc(String(dt).slice(11,16)||"—")}</span>`;
     const scoreText=done||live?`${esc(score(f,"home"))}<i>:</i>${esc(score(f,"away"))}`:"— : —";
     return `<article class="fixture-card" data-fixture-id="${esc(fixtureId(f))}">
@@ -137,7 +148,8 @@ function renderFixtures(){
         <div class="fixture-score">${scoreText}</div>
         <div class="fixture-team away"><b>${esc(teams.awayName)}</b>${crest(teams.awayName,teams.awayLogo||state.crestById.get(String(teams.awayId||"")),true)}</div>
       </div>
-      ${forecastMarkup(teams)}
+      <div class="fixture-referee"><span>⚖ Sędzia:</span><b>${refName?esc(refName):"Nie podano w danych spotkania"}</b>${refStats?`<small>${refStats.matches} meczów • ${(Number(refStats.yellowCards||0)/Math.max(1,Number(refStats.matches)||0)).toFixed(2).replace(".",",")} żółtych kartek / mecz • ${(Number(refStats.fouls||0)/Math.max(1,Number(refStats.matches)||0)).toFixed(1).replace(".",",")} fauli / mecz</small>`:`<small>${refName?"Brak dopasowanych statystyk tego sędziego":"Obsada sędziowska nie została udostępniona przez źródło terminarza"}</small>`}</div>
+      ${forecastMarkup(teams,refName)}
     </article>`;
   }).join("");
 }
@@ -269,25 +281,39 @@ async function loadRefereeStats(){
   try{
     const snapshot=await api("/referees");
     const rows=Array.isArray(snapshot.data)?snapshot.data:(Array.isArray(snapshot.referees)?snapshot.referees:[]);
+    state.referees=rows;
+    const refereeSelect=$("#analysis-referee");
+    if(refereeSelect){const previous=refereeSelect.value;refereeSelect.innerHTML=`<option value="">Bez uwzględniania sędziego</option>`+rows.slice().sort((a,b)=>a.name.localeCompare(b.name,"pl")).map(r=>`<option value="${esc(r.refereeId)}">${esc(r.name)}</option>`).join("");refereeSelect.value=previous;}
     if(snapshot.available===false || !rows.length){
       body.innerHTML='<tr><td colspan="9" class="empty">Brak zapisanych statystyk. Oczekiwanie na pierwszą ręczną synchronizację.</td></tr>';
       status.textContent=snapshot.message||"Statystyki sędziów nie zostały jeszcze zsynchronizowane.";
       updated.textContent="Brak daty ostatniej aktualizacji";
       return;
     }
-    body.innerHTML=rows.sort((a,b)=>(Number(b.matches)||0)-(Number(a.matches)||0)).map((r,i)=>{
-      const m=Number(r.matches)||0,y=Number(r.yellowCards)||0,f=Number(r.fouls)||0;
-      return `<tr><td class="rank">${i+1}</td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
-    }).join("");
+    state.referees=rows;
+    renderRefereeTable();
     const date=snapshot.updatedAt||snapshot.fetchedAt;
     status.textContent=`Pobrano ${rows.length} profili sędziowskich. Źródło: Zawód Typer.`;
     updated.textContent=date?`Ostatnia synchronizacja: ${new Date(date).toLocaleString("pl-PL")}`:"Data synchronizacji nieznana";
     $("#referee-period").textContent=`SEZON ${rows[0]?.season||snapshot.season||"—"} • ${rows.length} SĘDZIÓW`;
+    renderFixtures();
+    return;
   }catch(error){
     body.innerHTML=`<tr><td colspan="9" class="empty">${esc(error.message||"Nie udało się pobrać statystyk sędziów.")}</td></tr>`;
     status.textContent="Dane sędziowskie nie są jeszcze dostępne. Ostatni poprawny zapis pozostaje zachowany po stronie serwera.";
     updated.textContent="Oczekiwanie na synchronizację";
   }
+}
+function renderRefereeTable(){
+  const body=$("#referees-body");if(!body)return;
+  const query=normalizePersonName($("#referee-search")?.value||"");
+  const key=$("#referee-sort")?.value||"matches";
+  const fields={matches:"matches",yellow:"yellowCards",red:"redCards",fouls:"fouls",penalties:"penalties"};
+  const rows=state.referees.filter(r=>!query||normalizePersonName(r.name).includes(query)).sort((a,b)=>(Number(b[fields[key]])||0)-(Number(a[fields[key]])||0));
+  body.innerHTML=rows.map((r,i)=>{
+      const m=Number(r.matches)||0,y=Number(r.yellowCards)||0,f=Number(r.fouls)||0;
+      return `<tr><td class="rank">${i+1}</td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
+    }).join("");
 }
 
 function renderDiscipline(){
@@ -297,8 +323,8 @@ function renderDiscipline(){
   const topCards=[...data].sort((a,b)=>b.y-a.y).slice(0,10),topFouls=[...data].sort((a,b)=>b.f-a.f).slice(0,10);
   drawChart("cards-chart",topCards.map(x=>x.name),topCards.map(x=>x.y),"Żółte kartki w sezonie","#e8bd4d");
   drawChart("fouls-chart",topFouls.map(x=>x.name),topFouls.map(x=>x.f),"Faule w sezonie","#6aa7ff");
-  $("#cards-chart-note").textContent="TOP 10 • łączna liczba żółtych kartek od początku bieżącego sezonu.";
-  $("#fouls-chart-note").textContent="TOP 10 • łączna liczba fauli od początku bieżącego sezonu.";
+  $("#cards-chart-note").textContent="10 NAJWYŻSZYCH WYNIKÓW • łączna liczba żółtych kartek od początku bieżącego sezonu.";
+  $("#fouls-chart-note").textContent="10 NAJWYŻSZYCH WYNIKÓW • łączna liczba fauli od początku bieżącego sezonu.";
   $("#discipline-period").textContent=`PEŁNY SEZON • ${state.seasonMatches.length} ZAKOŃCZONYCH MECZÓW • ${state.seasonStart} – ${state.seasonEnd}`;
 }
 function drawChart(id,labels,values,label,color){
@@ -320,7 +346,12 @@ function analyze(){
   if(!h||!a||h===a){out.innerHTML='<div class="result-placeholder">Wybierz dwie różne drużyny, aby oszacować liczbę kartek.</div>';return;}
   const home=state.discipline.find(x=>String(x.id)===h),away=state.discipline.find(x=>String(x.id)===a);
   if(!home||!away||!home.m||!away.m){out.innerHTML='<div class="result-placeholder">Brakuje historycznych danych o kartkach dla jednej z drużyn.</div>';return;}
-  const lambda=Math.max(0.1,home.yAvg+away.yAvg);
+  const teamLambda=Math.max(0.1,home.yAvg+away.yAvg);
+  const selectedRef=state.referees.find(r=>String(r.refereeId)===$("#analysis-referee")?.value);
+  const refAvg=selectedRef&&Number(selectedRef.matches)>0?Number(selectedRef.yellowCards||0)/Number(selectedRef.matches):null;
+  const leagueRefAvg=state.referees.length?state.referees.reduce((sum,r)=>sum+(Number(r.matches)>0?Number(r.yellowCards||0)/Number(r.matches):0),0)/state.referees.filter(r=>Number(r.matches)>0).length:0;
+  // Eksperymentalna korekta: 25% wpływu średniej sędziego względem średniej ligowej.
+  const lambda=refAvg!==null&&leagueRefAvg>0?Math.max(.1,teamLambda*(.75+.25*(refAvg/leagueRefAvg))):teamLambda;
   const low=poissonProbAtLeast(lambda,4); // 4+ cards
   const lowThree=Math.max(0,1-low-poissonProbExactly(lambda,4));
   const exactlyFour=poissonProbExactly(lambda,4);
@@ -335,17 +366,17 @@ function analyze(){
     <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>ŚREDNIO (4)</small><strong style="font-size:28px;color:#e8bd4d;">${pct(exactlyFour)}</strong></div>
     <div class="probability-card" style="padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:8px;"><small>DUŻO KARTEK (5+)</small><strong style="font-size:28px;color:#ff7185;">${pct(high)}</strong></div>
   </div>
-  <p class="disclaimer">Szacunek modelowy Poissona. Oparty na średniej liczbie żółtych kartek obu drużyn w bieżącym sezonie (${home.m} i ${away.m} meczów z danymi). Faule pokazujemy jako sumę średnich drużyn. Statystyki sędziego zostaną uwzględnione dopiero po uzyskaniu potwierdzonego identyfikatora arbitra i jego historii. Nie jest to gwarancja wyniku ani porada bukmacherska.</p>`;
+  <p class="disclaimer">Szacunek modelowy Poissona na podstawie średnich drużyn z bieżącego sezonu (${home.m} i ${away.m} meczów). ${selectedRef?`Uwzględniono sędziego ${esc(selectedRef.name)}: ${refAvg.toFixed(2).replace(".",",")} żółtej kartki / mecz; wpływ arbitra ma eksperymentalną wagę 25% względem średniej ligowej.`:"Nie wybrano sędziego, więc prognoza opiera się wyłącznie na danych drużyn."} Faule pokazujemy jako sumę średnich obu drużyn. To szacunek, nie gwarancja wyniku ani porada bukmacherska.</p>`;
 }
 async function refreshAll(){
   if(state.busy)return;state.busy=true;
   try{
-    $("#live-matches").innerHTML='<div class="loading-line">Łączenie z API…</div>';
+    $("#live-matches").innerHTML='<div class="loading-line">Pobieranie danych…</div>';
     if(!state.leagueId)await findLeague();
     await Promise.all([loadStandings(),loadLive(),loadFixtures(state.selectedDate)]);
     $("#discipline-period").textContent="Pobieranie wszystkich zakończonych spotkań bieżącego sezonu…";
     await loadSeasonDiscipline();
-    toast("Pobrano dane sezonowe i odświeżono dashboard.");
+    toast("Pobrano dane sezonowe i odświeżono pulpit analityczny.");
   }catch(e){showError(e.message);$("#live-matches").innerHTML=`<div class="no-live">${esc(e.message)}</div>`;}
   finally{state.busy=false;}
 }
@@ -356,7 +387,9 @@ function init(){
   $("#date-next").onclick=()=>{const d=new Date(state.selectedDate);d.setDate(d.getDate()+1);selectDate(d);};
   $("#month-prev").onclick=()=>{state.month.setMonth(state.month.getMonth()-1);loadCalendarMonth();};
   $("#month-next").onclick=()=>{state.month.setMonth(state.month.getMonth()+1);loadCalendarMonth();};
-  $("#home-team").onchange=analyze;$("#away-team").onchange=analyze;
+  $("#home-team").onchange=analyze;$("#away-team").onchange=analyze;$("#analysis-referee").onchange=analyze;
+  $("#referee-search")?.addEventListener("input",renderRefereeTable);
+  $("#referee-sort")?.addEventListener("change",renderRefereeTable);
   $("#settings-open").onclick=()=>$("#settings-modal").classList.add("open");
   $("#settings-close").onclick=()=>$("#settings-modal").classList.remove("open");
   $("#settings-modal").onclick=e=>{if(e.target.id==="settings-modal")e.currentTarget.classList.remove("open");};
