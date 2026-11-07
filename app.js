@@ -262,6 +262,34 @@ async function loadSeasonDiscipline(){
   state.seasonStatsLoaded=true;renderDiscipline();renderFixtures();
   try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline,cardMatchTotals}));}catch(e){}
 }
+
+async function loadRefereeStats(){
+  const body=$("#referees-body"),status=$("#referee-status"),updated=$("#referee-updated");
+  if(!body)return;
+  try{
+    const snapshot=await api("/referees");
+    const rows=Array.isArray(snapshot.data)?snapshot.data:(Array.isArray(snapshot.referees)?snapshot.referees:[]);
+    if(snapshot.available===false || !rows.length){
+      body.innerHTML='<tr><td colspan="9" class="empty">Brak zapisanych statystyk. Oczekiwanie na pierwszą ręczną synchronizację.</td></tr>';
+      status.textContent=snapshot.message||"Statystyki sędziów nie zostały jeszcze zsynchronizowane.";
+      updated.textContent="Brak daty ostatniej aktualizacji";
+      return;
+    }
+    body.innerHTML=rows.sort((a,b)=>(Number(b.matches)||0)-(Number(a.matches)||0)).map((r,i)=>{
+      const m=Number(r.matches)||0,y=Number(r.yellowCards)||0,f=Number(r.fouls)||0;
+      return `<tr><td class="rank">${i+1}</td><td><b>${esc(r.name)}</b></td><td>${m}</td><td class="yellow-num">${y}</td><td class="red-num">${Number(r.redCards)||0}</td><td>${f}</td><td>${Number(r.penalties)||0}</td><td>${m?(y/m).toFixed(2):"—"}</td><td>${m?(f/m).toFixed(2):"—"}</td></tr>`;
+    }).join("");
+    const date=snapshot.updatedAt||snapshot.fetchedAt;
+    status.textContent=`Pobrano ${rows.length} profili sędziowskich. Źródło: Zawód Typer.`;
+    updated.textContent=date?`Ostatnia synchronizacja: ${new Date(date).toLocaleString("pl-PL")}`:"Data synchronizacji nieznana";
+    $("#referee-period").textContent=`SEZON ${rows[0]?.season||snapshot.season||"—"} • ${rows.length} SĘDZIÓW`;
+  }catch(error){
+    body.innerHTML=`<tr><td colspan="9" class="empty">${esc(error.message||"Nie udało się pobrać statystyk sędziów.")}</td></tr>`;
+    status.textContent="Dane sędziowskie nie są jeszcze dostępne. Ostatni poprawny zapis pozostaje zachowany po stronie serwera.";
+    updated.textContent="Oczekiwanie na synchronizację";
+  }
+}
+
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
   if(!data.length){body.innerHTML='<tr><td colspan="9" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
@@ -336,7 +364,7 @@ function init(){
   $("#mobile-menu").onclick=()=>$("#mobile-nav").classList.toggle("open");
   $("#mobile-nav").querySelectorAll("a").forEach(a=>a.onclick=()=>$("#mobile-nav").classList.remove("open"));
   document.querySelectorAll(".nav-link").forEach(a=>a.addEventListener("click",()=>{document.querySelectorAll(".nav-link").forEach(n=>n.classList.remove("active"));a.classList.add("active");}));
-  loadCalendarMonth();refreshAll();
+  loadCalendarMonth();refreshAll();loadRefereeStats();
 }
 document.addEventListener("DOMContentLoaded",init);
 })();
