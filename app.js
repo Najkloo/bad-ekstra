@@ -162,26 +162,31 @@ async function getFixtureDiscipline(f){
     const d=j.data||j.stats||j;
     if(j.available!==false && (d.home||d.away)) statsData=d;
   } catch(e) {}
-  if(!statsData || statsData.home?.yellow_cards==null || statsData.away?.yellow_cards==null){
+  if(!statsData || statsData.home?.yellow_cards==null || statsData.away?.yellow_cards==null || statsData.home?.red_cards==null || statsData.away?.red_cards==null){
     try {
       const ej=await api(`/fixtures/${id}/events`);
       events=unwrap(ej);
     } catch(e) {}
   }
-  const countEvents=(side,type) => events.filter(ev =>
-    String(ev.team_side||ev.side||"").toLowerCase()===side &&
-    String(ev.event_type||ev.type||"").toLowerCase().includes(type)
-  ).length;
+  const eventSide = (ev) => String(ev.team_side || ev.side || ev.teamSide || "").toLowerCase();
+  const eventType = (ev) => String(ev.event_type || ev.type || ev.detail || ev.name || "").toLowerCase();
+  const countEvents=(side,kind) => events.filter(ev => {
+    const sideValue=eventSide(ev), typeValue=eventType(ev);
+    const sameSide=sideValue===side || sideValue.includes(side);
+    const isYellow=typeValue.includes("yellow") || typeValue.includes("żółt");
+    const isRed=typeValue.includes("red") || typeValue.includes("czerw") || typeValue.includes("second_yellow") || typeValue.includes("second yellow");
+    return sameSide && (kind==="yellow"?isYellow:isRed);
+  }).length;
   const h=statsData?.home||{}, a=statsData?.away||{};
-  const hY=h.yellow_cards ?? h.yellowCards ?? countEvents("home","yellow");
-  const aY=a.yellow_cards ?? a.yellowCards ?? countEvents("away","yellow");
-  const hR=h.red_cards ?? h.redCards ?? countEvents("home","red");
-  const aR=a.red_cards ?? a.redCards ?? countEvents("away","red");
+  const hY=h.yellow_cards ?? h.yellowCards ?? (events.length?countEvents("home","yellow"):null);
+  const aY=a.yellow_cards ?? a.yellowCards ?? (events.length?countEvents("away","yellow"):null);
+  const hR=h.red_cards ?? h.redCards ?? (events.length?countEvents("home","red"):null);
+  const aR=a.red_cards ?? a.redCards ?? (events.length?countEvents("away","red"):null);
   const hF=h.fouls ?? h.total_fouls ?? null;
   const aF=a.fouls ?? a.total_fouls ?? null;
-  const hasCards=events.length>0 || h.yellow_cards!=null || a.yellow_cards!=null || h.yellowCards!=null || a.yellowCards!=null;
-  return {home:{...h,yellow_cards:Number(hY)||0,red_cards:Number(hR)||0,fouls:hF==null?null:Number(hF)},
-          away:{...a,yellow_cards:Number(aY)||0,red_cards:Number(aR)||0,fouls:aF==null?null:Number(aF)},
+  const hasCards=hY!=null || aY!=null || hR!=null || aR!=null;
+  return {home:{...h,yellow_cards:hY==null?null:Number(hY),red_cards:hR==null?null:Number(hR),fouls:hF==null?null:Number(hF)},
+          away:{...a,yellow_cards:aY==null?null:Number(aY),red_cards:aR==null?null:Number(aR),fouls:aF==null?null:Number(aF)},
           hasCards,hasFouls:hF!=null||aF!=null};
 }
 async function loadFixtureAnalysis(f){
@@ -220,7 +225,7 @@ async function mapLimit(items,limit,fn){
 async function loadSeasonDiscipline(){
   const start=seasonStartDate(),end=new Date();state.seasonStart=fmtDate(start);state.seasonEnd=fmtDate(end);
   $("#discipline-period").textContent=`PEŁNY SEZON • ${start.getFullYear()}/${String(start.getFullYear()+1).slice(-2)} • ${state.seasonStart} – ${state.seasonEnd}`;
-  const cacheKey=`ei-discipline-v3-${state.leagueId}-${state.seasonStart}-${state.seasonEnd}`;
+  const cacheKey=`ei-discipline-v4-${state.leagueId}-${state.seasonStart}-${state.seasonEnd}`;
   try{
     const cached=JSON.parse(localStorage.getItem(cacheKey)||"null");
     if(cached&&Date.now()-cached.savedAt<30*60*1000&&Array.isArray(cached.data)){
@@ -243,7 +248,7 @@ async function loadSeasonDiscipline(){
     .sort((a,b)=>String(fixtureDateTime(a)).localeCompare(String(fixtureDateTime(b))));
   if(!state.seasonMatches.length){state.discipline=[];state.seasonCardMatchTotals=[];renderDiscipline();renderFixtures();return;}
   const agg=new Map(), cardMatchTotals=[];
-  const ensure=(id,name,logo)=>{const key=String(id??name);if(!agg.has(key))agg.set(key,{id:key,name,logo,y:0,r:0,f:0,m:0,cardMatches:0,foulMatches:0});return agg.get(key);};
+  const ensure=(id,name,logo)=>{const key=String(id??name);if(!agg.has(key))agg.set(key,{id:key,name,logo,y:0,r:0,f:0,m:0,cardMatches:0,redMatches:0,foulMatches:0});return agg.get(key);};
   let statDone=0,cardMatchesAvailable=0;
   await mapLimit(state.seasonMatches,5,async fixture=>{
     const id=fixtureId(fixture);if(!id)return;
@@ -254,9 +259,10 @@ async function loadSeasonDiscipline(){
       const away=ensure(t.awayId??`${id}-a`,t.awayName,t.awayLogo||state.crestById.get(String(t.awayId||"")));
       if(d.hasCards){
         home.y+=h.yellow_cards;away.y+=a.yellow_cards;
-        home.r+=h.red_cards;away.r+=a.red_cards;
+        if(h.red_cards!=null){home.r+=h.red_cards;home.redMatches++;}
+        if(a.red_cards!=null){away.r+=a.red_cards;away.redMatches++;}
         home.m++;away.m++;home.cardMatches++;away.cardMatches++;
-        cardMatchTotals.push(h.yellow_cards+a.yellow_cards);
+        if(h.yellow_cards!=null && a.yellow_cards!=null)cardMatchTotals.push(h.yellow_cards+a.yellow_cards);
         cardMatchesAvailable++;
       }
       if(d.hasFouls){
@@ -270,7 +276,7 @@ async function loadSeasonDiscipline(){
   state.seasonCardMatchTotals=cardMatchTotals;
   state.discipline=[...agg.values()].filter(x=>x.cardMatches>0||x.foulMatches>0).map(x=>({
     ...x,m:x.cardMatches,yAvg:x.cardMatches?x.y/x.cardMatches:0,
-    rAvg:x.cardMatches?x.r/x.cardMatches:0,fAvg:x.foulMatches?x.f/x.foulMatches:0
+    rAvg:x.redMatches?x.r/x.redMatches:null,fAvg:x.foulMatches?x.f/x.foulMatches:0
   })).sort((a,b)=>b.y-a.y||b.r-a.r);
   state.seasonStatsLoaded=true;renderDiscipline();renderFixtures();
   try{localStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),matchCount:state.seasonMatches.length,data:state.discipline,cardMatchTotals}));}catch(e){}
@@ -320,12 +326,15 @@ function renderRefereeTable(){
 function renderDiscipline(){
   const data=state.discipline,body=$("#discipline-body");
   if(!data.length){body.innerHTML='<tr><td colspan="9" class="empty">Brak statystyk dyscyplinarnych dla bieżącego sezonu. Sprawdź dostępność statystyk meczowych w SportAPI.ai.</td></tr>';return;}
-  body.innerHTML=data.map((x,i)=>`<tr class="rank-row rank-${i<3?i+1:"other"}"><td class="rank"><span>${i+1}</span></td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.r}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td><td>${x.rAvg.toFixed(2)}</td><td>${x.fAvg.toFixed(2)}</td></tr>`).join("");
+  body.innerHTML=data.map((x,i)=>`<tr class="rank-row rank-${i<3?i+1:"other"}"><td class="rank"><span>${i+1}</span></td><td><div class="team-cell">${crest(x.name,x.logo)}<b>${esc(x.name)}</b></div></td><td class="yellow-num">${x.y}</td><td class="red-num">${x.redMatches?x.r:"—"}</td><td>${x.f}</td><td>${x.m}</td><td>${x.yAvg.toFixed(2)}</td><td>${x.rAvg==null?"—":x.rAvg.toFixed(2)}</td><td>${x.fAvg.toFixed(2)}</td></tr>`).join("");
   const topCards=[...data].sort((a,b)=>b.y-a.y).slice(0,10),topFouls=[...data].sort((a,b)=>b.f-a.f).slice(0,10);
   drawChart("cards-chart",topCards.map(x=>x.name),topCards.map(x=>x.y),"Żółte kartki w sezonie","#e8bd4d");
   drawChart("fouls-chart",topFouls.map(x=>x.name),topFouls.map(x=>x.f),"Faule w sezonie","#6aa7ff");
   $("#cards-chart-note").textContent="10 NAJWYŻSZYCH WYNIKÓW • łączna liczba żółtych kartek od początku bieżącego sezonu.";
   $("#fouls-chart-note").textContent="10 NAJWYŻSZYCH WYNIKÓW • łączna liczba fauli od początku bieżącego sezonu.";
+  const redCoverage=data.reduce((sum,x)=>sum+x.redMatches,0), cardCoverage=data.reduce((sum,x)=>sum+x.cardMatches,0);
+  const redHead=document.querySelector('#discipline-body')?.closest('table')?.querySelector('thead th:nth-child(4)');
+  if(redHead)redHead.title=redCoverage<cardCoverage?`Czerwone kartki potwierdzone w ${redCoverage} z ${cardCoverage} obserwacji drużyna–mecz. Brakujące dane oznaczamy kreską, nie zerem.`:"Dane o czerwonych kartkach z dostępnych statystyk meczowych.";
   $("#discipline-period").textContent=`PEŁNY SEZON • ${state.seasonMatches.length} ZAKOŃCZONYCH MECZÓW • ${state.seasonStart} – ${state.seasonEnd}`;
 }
 function drawChart(id,labels,values,label,color){
